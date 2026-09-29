@@ -57,7 +57,7 @@ La fuente de verdad son los tags y `git-cliff`. Resumen:
 
 ## [2.0.0] — 2026-09-14
 - Renombrado a `keybackcon` ("Keyboard Backlight Controls"), repo
-  `Iniciativas-Alexendros/keybackcon`, App ID `org.iniciativas.keybackcon`.
+  `Soluciones-Alexendros/keybackcon`, App ID `org.iniciativas.keybackcon`.
 - CLI migrado a Cargo por módulos (`lamp/color/state/animation/cli`), cero
   dependencias, mismos comandos + alias `bright/auto/anim`, rutas nuevas con
   migración heredada `kbd-rgb`.
