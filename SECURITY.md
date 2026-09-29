@@ -19,7 +19,7 @@ La versión vive en `Cargo.toml`. El tag `vX.Y.Z` debe coincidir.
 
 **No abras un issue público** si el hallazgo puede elevar privilegios (udev/`pkexec`), inyectar rutas o hablar con el HID de forma inesperada.
 
-1. Preferible: [GitHub Security Advisory](https://github.com/Iniciativas-Alexendros/keybackcon/security/advisories/new) en este repositorio.
+1. Preferible: [GitHub Security Advisory](https://github.com/Soluciones-Alexendros/keybackcon/security/advisories/new) en este repositorio.
 2. Alternativa: correo a [operaciones@alexendros.dev](mailto:operaciones@alexendros.dev).
 
 Incluye: versión o commit, comando reproducido, distro, y un descriptor **mínimo** (nunca dumps con datos personales). Responderemos en un plazo máximo de 7 días naturales.
