@@ -1,11 +1,8 @@
 name: Versionado
-# Autoversionado: en cada push a main, git-cliff calcula el bump desde los
-# commits convencionales (feat/fix/...) desde el último tag; si hay bump,
-# sincroniza las fuentes de versión (Cargo.toml, gui/__init__.py, PKGBUILD),
-# abre un PR de release en auto-merge y crea el tag vX.Y.Z. Al tag le sigue
-# un workflow_dispatch de Release y NPM (un push con GITHUB_TOKEN no los
-# dispararía). El CHANGELOG.md se mantiene curado a mano por release: no lo
-# regenera este workflow. Los commits chore no bumpan (skip en cliff.toml).
+# Autoversionado: en cada push a main, git-cliff calcula el bump; si hay bump,
+# sincroniza fuentes de versión, abre un PR de release en auto-merge.
+# El tag vX.Y.Z se crea SOLO tras fusionar el PR (H-34), sobre el commit
+# aprobado en main — nunca en la rama del PR antes del merge.
 on:
   push:
     branches: [main]
@@ -39,9 +36,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      # No usamos orhun/git-cliff-action: su output interno falla al parsear
-      # el resultado (jq) y deja el bump vacío sin error visible. Aquí leemos
-      # la versión directamente de la salida del binario.
       - name: Bump calculado por git-cliff
         id: cliff
         run: |
@@ -50,11 +44,7 @@ jobs:
           echo "version=${BUMPED#v}" >> "$GITHUB_OUTPUT"
           echo "bump calculado: '${BUMPED#v}'"
 
-      # main es rama protegida (requiere checks) y los eventos de GITHUB_TOKEN
-      # no disparan workflows: por eso se empuja una rama y se fusiona con un
-      # PR en auto-merge, y el tag se acompaña de un workflow_dispatch manual
-      # de Release y NPM (los dispatch sí encadenan workflows con este token).
-      - name: Sincronizar versiones, PR de release y tag
+      - name: Sincronizar versiones y PR de release (sin tag)
         if: steps.cliff.outputs.version != '' && steps.cliff.outputs.version != steps.current.outputs.version
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,27 +54,51 @@ jobs:
           OLD="${{ steps.current.outputs.version }}"
           echo "bump: $OLD -> $NEW"
           sed -i "s/^version = \"$OLD\"/version = \"$NEW\"/" Cargo.toml
+          # Mantener Cargo.lock alineado con Cargo.toml (H-01 / H-35).
+          cargo update -p keybackcon
           sed -i "s/^__version__ = \".*\"/__version__ = \"$NEW\"/" gui/__init__.py
           sed -i "s/^pkgver=.*/pkgver=$NEW/" packaging/aur/PKGBUILD
+          if [ -f npm/package.json ]; then
+            sed -i "s/\"version\": \"$OLD\"/\"version\": \"$NEW\"/" npm/package.json || true
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml gui/__init__.py packaging/aur/PKGBUILD
+          git add Cargo.toml Cargo.lock gui/__init__.py packaging/aur/PKGBUILD
+          git add npm/package.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "sin cambios: el release ya está en camino"
             exit 0
           fi
-          # Sin [skip ci]: la rama del release necesita checks para que el
-          # auto-merge del PR pueda completarse (la protección los exige).
           git commit -m "chore(release): prepara v$NEW"
           BRANCH="chore/release-v$NEW"
-          git tag "v$NEW"
-          git push origin "HEAD:$BRANCH" --tags
-          # gh pr merge sin argumentos resuelve la rama del checkout (main),
-          # no el PR recién creado: hay que pasarle el número explícito.
+          git push origin "HEAD:$BRANCH"
           PR_URL="$(gh pr create --base main --head "$BRANCH" \
             --title "chore(release): v$NEW" \
-            --body "Sincroniza Cargo.toml, gui/__init__.py y packaging/aur/PKGBUILD a v$NEW. El tag v$NEW dispara Release y NPM.")"
+            --body "Sincroniza versiones a v$NEW. Tras el merge, el job tag-after-merge crea el tag y dispara Release/NPM.")"
           PR_NUM="${PR_URL##*/}"
-          gh pr merge "$PR_NUM" --auto --squash --delete-branch
+          gh pr merge "$PR_NUM" --auto --merge --delete-branch
+
+  tag-after-merge:
+    # Solo commits de preparación de release ya en main.
+    if: startsWith(github.event.head_commit.message, 'chore(release): prepara v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Crear tag sobre el commit fusionado y disparar publicación
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NEW="$(grep -m1 '^version' Cargo.toml | sed -E 's/.*\"([^\"]+)\".*/\1/')"
+          if git rev-parse "v$NEW" >/dev/null 2>&1; then
+            echo "el tag v$NEW ya existe"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v$NEW"
+          git push origin "v$NEW"
           gh workflow run Release --ref "v$NEW"
           gh workflow run NPM --ref "v$NEW"

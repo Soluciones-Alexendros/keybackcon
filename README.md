@@ -25,47 +25,63 @@ La mesa de luz vive también en la **bandeja del sistema**
 
 ## Empieza en 3 pasos
 
-1. Instala el `.deb` (ver abajo; en Arch: `yay -S keybackcon`).
+1. Instala el `.deb` desde la
+   [release](https://github.com/Soluciones-Alexendros/keybackcon/releases)
+   (o el script local; ver abajo).
 2. Fija un color: `keybackcon set ff7800`.
-3. Abre la mesa de luz: `keybackcon-gui`.
+3. Abre la mesa de luz: `keybackcon-gui` (requiere GTK4 y libadwaita ≥ 1.5).
 
 ## Instalación
 
-1. **npm (un comando, cualquier distro):** `npm install -g keybackcon`
-   instala el binario precompilado (Linux x86_64/arm64) y configura
-   automáticamente la regla udev y las unidades systemd de usuario
-   (restauración al login incluida). Omite la regla udev con
-   `KEYBACKCON_SKIP_UDEV=1 npm install -g keybackcon`.
-2. **Ubuntu/Debian (`.deb`):** descarga el `.deb` de cada
-   [release](https://github.com/Soluciones-Alexendros/keybackcon/releases)
+1. **Ubuntu/Debian (`.deb`, canal principal de GUI+CLI):** descarga el `.deb`
+   de cada [release](https://github.com/Soluciones-Alexendros/keybackcon/releases)
    e instala con `sudo apt install ./keybackcon_X.Y.Z-1_amd64.deb`
-   (binario, GUI, icono, regla udev y unidades de usuario).
-3. **Arch Linux (AUR):** `yay -S keybackcon` (o `paru -S keybackcon`).
-4. **Script local (`~/.local`):** `./scripts/install.sh`
+   (binario, GUI, icono, regla udev y unidades de usuario). Debian 12:
+   el CLI funciona; la mesa de luz nativa exige libadwaita ≥ 1.5 (ver matriz).
+2. **Script local (`~/.local`):** `./scripts/install.sh`
    (pide sudo una vez para la regla udev).
+3. **npm (solo CLI):** `npm install -g keybackcon` instala el binario
+   precompilado (Linux x86_64/arm64) y, si el postinstalador lo permite, la
+   regla udev y unidades de usuario. **No** incluye la mesa de luz GTK ni
+   sus recursos. Omite udev con `KEYBACKCON_SKIP_UDEV=1`.
+4. **Arch (AUR):** el empaquetado existe en el árbol del repo; la publicación
+   AUR y los checksums **no están verificados** en esta revisión. No uses
+   `yay -S keybackcon` como canal acreditado hasta que la matriz lo marque
+   como probado. Mientras tanto: script local o binario de la release.
+5. **Fedora:** usa el script local o el CLI de npm. El empaquetado RPM **no
+   está verificado** aún.
 
 Cada release trae además el tarball `keybackcon-vX.Y.Z-linux-x86_64.tar.gz`,
-`SHA256SUMS` y SBOM CycloneDX.
+`SHA256SUMS` y SBOM CycloneDX (inventario del crate Rust; la GUI tiene
+dependencias de sistema aparte).
+
+Matriz completa (probado / candidato / experimental / no soportado):
+[`docs/compatibility/matriz.md`](docs/compatibility/matriz.md).
 
 ## Compatibilidad
 
-El CLI `keybackcon` es un binario sin dependencias (solo libc): funciona en
-cualquier Linux con systemd o sin él. La GUI (GTK4/Adwaita) y la bandeja
-(Ayatana) necesitan los paquetes de tu distro:
+El CLI es un binario sin crates externos (sí depende de libc y del kernel).
+La mesa de luz necesita **GTK 4** y **libadwaita ≥ 1.5**. La bandeja
+(Ayatana) es opcional y separada.
 
-| Distro | Instalación | Paquetes de la GUI/bandeja |
-|---|---|---|
-| Cualquiera (con Node) | `npm install -g keybackcon` | el postinstalador lo configura todo |
-| Debian/Ubuntu | `.deb` o `./scripts/install.sh` | `python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-ayatanaappindicator3-0.1 python3-cairo` |
-| Arch/Manjaro | AUR (`keybackcon`) | `python-gobject gtk4 libadwaita libayatana-appindicator python-cairo` |
-| Fedora | `./scripts/install.sh` o npm | `python3-gobject gtk4 libadwaita libayatana-appindicator-gtk3 python3-cairo` |
-| openSUSE | `./scripts/install.sh` o npm | `python3-gobject gtk4 libadwaita libayatana-appindicator3-1 python3-cairo` |
+| Distro | Instalación | CLI | GUI (Adw ≥ 1.5) |
+|---|---|---|---|
+| Debian 12 | `.deb` / script | Candidato | No soportada (Adw 1.2) |
+| Debian 13 / Ubuntu 24.04+ | `.deb` / script | Candidato | Candidato si Adw ≥ 1.5 |
+| Ubuntu 22.04 | `.deb` / script | Candidato | Solo si Adw ≥ 1.5; si no, CLI |
+| Arch | script / release | Candidato | Candidato; AUR no acreditado |
+| Fedora | script / npm CLI | Candidato | Candidato; RPM no verificado |
+| openSUSE | — | Fuera del alcance anunciado | — |
+| npm | `npm i -g keybackcon` | Sí (solo binario) | No incluida |
 
-`install.sh` y la propia GUI detectan la distro (vía `/etc/os-release`) y
-dicen el comando exacto cuando falta algo. En distros sin systemd la regla
-udev y el binario siguen funcionando; las unidades de usuario se omiten y la
-restauración al login puede hacerse con el autostart de la bandeja
-(Preferencias → Arranque automático).
+`install.sh` y la GUI detectan la distro (`/etc/os-release`) y proponen el
+comando de paquetes cuando falta algo. Sin systemd: udev y CLI siguen
+válidos; las unidades de usuario se omiten. Hyprland: integración
+**experimental** hasta completar evidencias
+([`docs/guides/hyprland.md`](docs/guides/hyprland.md)).
+
+Contrato de brillo, apagado, restauración y JSON:
+[`docs/product/contrato.md`](docs/product/contrato.md).
 
 ## Uso
 
@@ -83,9 +99,11 @@ Atajos de la GUI: `Ctrl+1…9` cambia de filtro, `+`/`−` ajusta intensidad.
 
 ## Cómo funciona
 
-- Habla directamente con el teclado por USB: sin demonios ni servicios en medio.
-- Tu color y brillo se guardan y sobreviven a reinicios y animaciones.
-- Solo hay una animación a la vez: cambiar el color la detiene antes.
+- Habla directamente con el teclado por USB: el CLI es el único escritor; sin
+  demonio privilegiado en medio.
+- Tu color y brillo se guardan y sobreviven a reinicios. Ajustar el brillo
+  **no** detiene una animación en curso (la animación relee el porcentaje).
+- Solo hay una animación a la vez: fijar color o pedir `stop` la detiene antes.
 
 Detalle técnico (HID LampArray, informes, estado): [`docs/architecture/protocol.md`](docs/architecture/protocol.md),
 diseño en [`ARCHITECTURE.md`](ARCHITECTURE.md) y decisiones en [`docs/architecture/decisions/DECISIONS.md`](docs/architecture/decisions/DECISIONS.md).

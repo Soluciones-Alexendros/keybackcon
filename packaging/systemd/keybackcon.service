@@ -1,15 +1,17 @@
 [Unit]
-Description=Keyboard Backlight Controls — restaura tu color al iniciar sesión
-After=default.target
+Description=Keyboard Backlight Controls — restaura el color al iniciar sesión
+# Tras la sesión gráfica; evita After=default.target + WantedBy=default.target.
+After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/keybackcon restore
+# --on-login respeta restore_policy=never del estado persistido.
+ExecStart=/usr/bin/keybackcon restore --on-login
 RemainAfterExit=yes
-# Al iniciar sesión las ACL uaccess pueden no estar aplicadas todavía:
-# reintenta en vez de quedarse sin restaurar el color.
+# Al iniciar sesión las ACL uaccess pueden no estar aplicadas todavía.
 Restart=on-failure
 RestartSec=3
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target

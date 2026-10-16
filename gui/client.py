@@ -37,8 +37,22 @@ def udev_install_argv(src: str, dst: str) -> list[str]:
     return ["pkexec", "sh", "-c", script, "sh", src, dst]
 
 
+def _absolute_or_none(path: str | None) -> str | None:
+    if not path or not str(path).strip():
+        return None
+    p = os.path.expanduser(str(path).strip())
+    if not os.path.isabs(p):
+        return None
+    return p
+
+
 def state_paths():
-    base = os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
+    base = _absolute_or_none(os.environ.get("XDG_STATE_HOME"))
+    if base is None:
+        home = _absolute_or_none(os.environ.get("HOME")) or os.path.expanduser("~")
+        if not os.path.isabs(home):
+            home = "/var/tmp"
+        base = os.path.join(home, ".local/state")
     return (
         os.path.join(base, "keybackcon/state"),
         os.path.join(base, "kbd-rgb/state"),
@@ -46,7 +60,9 @@ def state_paths():
 
 
 def pid_paths():
-    base = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+    base = _absolute_or_none(os.environ.get("XDG_RUNTIME_DIR"))
+    if base is None:
+        base = f"/tmp/keybackcon-{os.getuid()}"
     return (
         os.path.join(base, "keybackcon/animation.pid"),
         os.path.join(base, "keybackcon/anim.pid"),
@@ -192,13 +208,30 @@ class KeybackconClient:
         for path in state_paths():
             try:
                 with open(path) as f:
-                    parts = f.read().split()
-                    color = parts[0].lstrip("#").lower()
-                    pct = int(parts[1]) if len(parts) > 1 else 100
-                    if len(color) != 6:
-                        raise ValueError
-                    int(color, 16)
-                    return color, max(0, min(100, pct))
+                    raw = f.read()
+                # Formato versionado (schema_version=…).
+                if "schema_version=" in raw or "base_color=" in raw:
+                    color, pct = "ffffff", 100
+                    for line in raw.splitlines():
+                        if "=" not in line:
+                            continue
+                        k, _, v = line.partition("=")
+                        k, v = k.strip(), v.strip()
+                        if k == "base_color":
+                            color = v.lstrip("#").lower()
+                        elif k == "brightness":
+                            pct = int(v)
+                    if len(color) == 6:
+                        int(color, 16)
+                        return color, max(0, min(100, pct))
+                    continue
+                parts = raw.split()
+                color = parts[0].lstrip("#").lower()
+                pct = int(parts[1]) if len(parts) > 1 else 100
+                if len(color) != 6:
+                    raise ValueError
+                int(color, 16)
+                return color, max(0, min(100, pct))
             except Exception:
                 continue
         return "ffffff", 100
@@ -210,7 +243,10 @@ class KeybackconClient:
                     pid = int(f.read().strip())
                 if pid <= 0:
                     continue
-                os.kill(pid, 0)
+                # /proc en lugar de kill(0): algunos sandboxes bloquean señales.
+                if not os.path.exists(f"/proc/{pid}"):
+                    os.unlink(path)
+                    continue
                 with open(f"/proc/{pid}/cmdline", "rb") as cf:
                     cmd = cf.read().decode(errors="ignore")
                 if "keybackcon" in cmd or "kbd-rgb" in cmd:

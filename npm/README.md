@@ -1,20 +1,23 @@
-# keybackcon (npm)
+# keybackcon (npm) — solo CLI
 
 Keyboard Backlight Controls — control RGB del teclado AERO X16 vía HID
-LampArray, sin dependencias. Este paquete instala el binario precompilado
-(Linux x86_64/arm64) y configura automáticamente la regla udev y las unidades
-systemd de usuario.
+LampArray. Este paquete instala el **binario precompilado** (Linux
+x86_64/arm64). **No** incluye la mesa de luz GTK ni sus recursos.
 
 ```sh
 npm install -g keybackcon
 ```
 
-El postinstalador:
+El postinstalador, si el entorno lo permite:
 
 - instala la regla udev de acceso al hidraw (vía `sudo`/`pkexec`; se omite con
-  `KEYBACKCON_SKIP_UDEV=1 npm install -g keybackcon` o si ya existe);
-- instala las unidades `keybackcon.service` (restaura tu color al iniciar
-  sesión) y `keybackcon-animation@.service` en `~/.config/systemd/user` y las
-  recarga con `systemctl --user daemon-reload`.
+  `KEYBACKCON_SKIP_UDEV=1` o si ya existe);
+- instala unidades systemd de usuario y ejecuta `daemon-reload`.
+  **No** habilita la restauración si el usuario la desactivó en el estado
+  persistido (`restore --on-login`).
 
-Fuente, GUI GTK, .deb y AUR: https://github.com/Soluciones-Alexendros/keybackcon
+Para la GUI: instala el `.deb` de la
+[release](https://github.com/Soluciones-Alexendros/keybackcon/releases) o usa
+`./scripts/install.sh` (requiere GTK 4 y libadwaita ≥ 1.5).
+
+Fuente y documentación: https://github.com/Soluciones-Alexendros/keybackcon

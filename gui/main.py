@@ -184,6 +184,24 @@ def _run_window(open_preferences=False, hide_on_close=False):
         _aviso_falta("GTK4/libadwaita (python3-gi)", exc, "gui")
         return 1
 
+    try:
+        from gui.preflight import check_gui_requirements
+    except ImportError:
+        try:
+            from preflight import check_gui_requirements
+        except ImportError:
+            check_gui_requirements = None
+    if check_gui_requirements is not None:
+        ok, msg = check_gui_requirements()
+        if not ok:
+            print(f"keybackcon-gui: {msg}", file=sys.stderr)
+            try:
+                sugerencia = load("compat").sugerencia_instalacion("gui")
+                print(f"  instala: {sugerencia}", file=sys.stderr)
+            except Exception:
+                log_exc("sugerencia de paquetes")
+            return 1
+
     MesaWindow = _load_window()
     app = Adw.Application(application_id=APP_ID)
     holder = {}

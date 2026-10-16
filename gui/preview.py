@@ -99,6 +99,18 @@ def draw_stage(area, ctx, w, h, *, color_hex, pct, mode, t0):
 
 
 def tick_stage(area):
+    preview = getattr(area, "_keybackcon_preview", None)
+    if preview is not None:
+        try:
+            if not preview._effects_enabled or not animations_enabled():
+                area.queue_draw()
+                return GLib.SOURCE_CONTINUE
+            # Escena estática (fijar sin partículas): repintar menos a menudo.
+            if preview.mode == "fijar" and preview._palive == 0:
+                area.queue_draw()
+                return GLib.SOURCE_CONTINUE
+        except Exception:
+            pass
     area.queue_draw()
     return GLib.SOURCE_CONTINUE
 
@@ -191,7 +203,16 @@ class StagePreview:
 
     def attach(self, area, interval=33):
         self._last_us = GLib.get_monotonic_time()
+        area._keybackcon_preview = self
         area.set_draw_func(self.draw, None)
+        # Con movimiento reducido o escena fija, intervalo más largo (UX-19).
+        try:
+            if not self._effects_enabled or not animations_enabled():
+                interval = max(interval, 250)
+            elif self.mode == "fijar":
+                interval = max(interval, 100)
+        except Exception:
+            pass
         return GLib.timeout_add(interval, self.tick, area)
 
     def _paint_fijar(self, ctx, w, h, t, dt):

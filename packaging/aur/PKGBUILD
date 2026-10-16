@@ -13,7 +13,8 @@ optdepends=('python-gobject: panel gráfico keybackcon-gui' 'gtk4: panel gráfic
 makedepends=('cargo' 'gettext')
 conflicts=('kbd-rgb')
 replaces=('kbd-rgb')
-# Pendiente de publicación AUR: sustituir 'SKIP' por el sha256 real con `updpkgsums` cuando toque publicar.
+# No anunciar AUR hasta checksum real + .SRCINFO + chroot (ver docs/compatibility/matriz.md).
+# Sustituir SKIP con `updpkgsums` antes de publicar.
 sha256sums=('SKIP')
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
 
