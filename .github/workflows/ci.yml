@@ -24,26 +24,36 @@ jobs:
       - name: Format
         run: cargo fmt --check
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
       - name: Rustdoc
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --no-deps
+      - name: Lockfile alineado
+        run: |
+          set -euo pipefail
+          VER_TOML=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          VER_LOCK=$(awk '/name = "keybackcon"/{getline; print; exit}' Cargo.lock | sed -E 's/.*"([^"]+)".*/\1/')
+          test "$VER_TOML" = "$VER_LOCK"
       - name: GUI py_compile
         run: python3 -m py_compile gui/*.py
       - name: GUI tests
         run: python3 -m unittest discover -s gui/tests
       - name: shellcheck
         run: |
-          if command -v shellcheck >/dev/null; then
-            shellcheck scripts/install.sh scripts/smoke.sh packaging/keybackcon-gui \
-              packaging/debian/postinst packaging/debian/prerm packaging/aur/PKGBUILD
-          else
-            bash -n scripts/install.sh
-            bash -n scripts/smoke.sh
-            bash -n packaging/keybackcon-gui
-            bash -n packaging/debian/postinst
-            bash -n packaging/debian/prerm
-            bash -n packaging/aur/PKGBUILD
-          fi
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck scripts/install.sh scripts/smoke.sh packaging/keybackcon-gui \
+            packaging/debian/postinst packaging/debian/prerm packaging/aur/PKGBUILD
+      - name: desktop-file-validate
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq desktop-file-utils
+          desktop-file-validate packaging/desktop/keybackcon.desktop
+      - name: gettext
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq gettext
+          msgfmt -c -o /tmp/keybackcon-test.mo po/es.po
 
   test:
     name: test
@@ -52,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test -- --test-threads=1
+      - run: cargo test --locked -- --test-threads=1
 
   msrv:
     name: msrv
@@ -61,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.87
-      - run: cargo test -- --test-threads=1
+      - run: cargo test --locked -- --test-threads=1
 
   build:
     name: build
@@ -70,7 +80,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --release
+      - run: cargo build --locked --release
+      - name: Árbol sin cambios tras build --locked
+        run: git diff --exit-code
       - uses: actions/upload-artifact@v4
         with:
           name: keybackcon-linux
@@ -90,10 +102,5 @@ jobs:
           path: target/release
       - run: chmod +x target/release/keybackcon
       - run: bash scripts/smoke.sh
-      - name: desktop-file-validate
-        run: |
-          if command -v desktop-file-validate >/dev/null; then
-            desktop-file-validate packaging/desktop/keybackcon.desktop
-          else
-            echo "desktop-file-validate no disponible; se omite"
-          fi
+      - name: Ayuda sale 0
+        run: target/release/keybackcon --help >/dev/null

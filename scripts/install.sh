@@ -108,6 +108,13 @@ fi
 
 echo "==> keybackcon: instalar unidades de usuario"
 mkdir -p "${UNIT_DST}"
+# Preferencia previa: no reactivar si el usuario deshabilitó o enmascaró.
+PREV_ENABLE=""
+if command -v systemctl >/dev/null 2>&1; then
+  PREV_ENABLE=$(systemctl --user is-enabled keybackcon.service 2>/dev/null || true)
+fi
+HAD_UNIT=0
+[ -f "${UNIT_DST}/keybackcon.service" ] && HAD_UNIT=1
 # Las unidades del paquete apuntan a /usr/bin; la instalación local las
 # reescribe a ~/.local/bin (mismo binario que acaba de instalarse arriba).
 sed 's|/usr/bin/keybackcon|%h/.local/bin/keybackcon|g' \
@@ -119,11 +126,18 @@ sed 's|/usr/bin/keybackcon|%h/.local/bin/keybackcon|g' \
 chmod 644 "${UNIT_DST}/keybackcon.service" "${UNIT_DST}/keybackcon-animation@.service"
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user daemon-reload || true
-  # No reactivar una unidad que el usuario desactivó a propósito: solo se
-  # activa si no existe estado previo (o si ya estaba activada).
-  if ! systemctl --user is-enabled keybackcon.service >/dev/null 2>&1; then
-    systemctl --user enable keybackcon.service || true
-  fi
+  case "${PREV_ENABLE}" in
+    disabled|masked)
+      echo "==> keybackcon: restauración ${PREV_ENABLE}; no se reactiva (H-26/H-27)"
+      ;;
+    enabled|enabled-runtime)
+      ;;
+    *)
+      if [ "${HAD_UNIT}" = "0" ] || [ "${KEYBACKCON_ENABLE_RESTORE:-0}" = "1" ]; then
+        systemctl --user enable keybackcon.service || true
+      fi
+      ;;
+  esac
 fi
 
 if [ "${KEYBACKCON_SKIP_UDEV:-0}" = "1" ]; then

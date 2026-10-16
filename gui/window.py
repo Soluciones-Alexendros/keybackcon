@@ -252,7 +252,6 @@ class MesaWindow(Adw.ApplicationWindow):
         for key, label in (("fijar", _("Fijar")), ("breathe", _("Respirar")), ("rainbow", _("Arcoíris"))):
             b = Gtk.ToggleButton(label=label)
             b.set_hexpand(True)
-            b.connect("toggled", self._on_mode, key)
             seg.append(b)
             self.seg_buttons[key] = b
         g_mov.add(seg)
@@ -278,9 +277,18 @@ class MesaWindow(Adw.ApplicationWindow):
         self.bright_scale.set_draw_value(False)
         self.bright_scale.set_hexpand(True)
         self.bright_scale.set_value(self.cur_pct)
+        try:
+            self.bright_scale.update_property(
+                (Gtk.AccessibleProperty.LABEL, Gtk.AccessibleProperty.VALUE_TEXT),
+                (_("Brillo"), f"{self.cur_pct} %"),
+            )
+        except Exception:
+            log_exc("accesible del brillo")
         self.bright_scale.connect("value-changed", self._on_bright_scale)
         brow.append(self.bright_scale)
+        minus.set_tooltip_text(_("Bajar brillo"))
         plus = Gtk.Button(label="+")
+        plus.set_tooltip_text(_("Subir brillo"))
         plus.connect("clicked", self._on_bright_step, 1)
         brow.append(plus)
         self.bright_value = Gtk.Label(label=f"{self.cur_pct}%")
@@ -342,11 +350,20 @@ class MesaWindow(Adw.ApplicationWindow):
         key_ctl = Gtk.EventControllerKey()
         key_ctl.connect("key-pressed", self._on_key)
         self.add_controller(key_ctl)
+        # Activar «Fijar» sin despachar comandos HID (H-02).
         self.seg_buttons["fijar"].set_active(True)
+        for key, b in self.seg_buttons.items():
+            b.connect("toggled", self._on_mode, key)
         self._mark_selected()
         self._refresh_caption()
         self._refresh_status()
         self._setup_state_watch()
+        try:
+            from gui.backend import BackendQueue
+            self._backend = BackendQueue(self._client)
+        except Exception:
+            log_exc("backend")
+            self._backend = None
         threading.Thread(target=self._arranque_info, daemon=True).start()
 
     # --- construcción auxiliar -------------------------------------------
@@ -376,58 +393,77 @@ class MesaWindow(Adw.ApplicationWindow):
 
     # --- llamadas al CLI (bloqueantes, solo por acción del usuario) ------
 
-    def _run_set(self, hexv, ok_msg=None):
+    def _backend_submit(self, kind, payload=None, on_done=None):
+        backend = getattr(self, "_backend", None)
+        if backend is None:
+            # Sin cola: ruta síncrona de respaldo (tests / import parcial).
+            try:
+                if kind == "set":
+                    self._client.set_color(payload)
+                elif kind == "brightness":
+                    self._client.set_brightness(payload)
+                elif kind == "stop":
+                    self._client.stop()
+                elif kind == "animation":
+                    self._client.animation(payload)
+                if on_done:
+                    on_done(True, None)
+                return True
+            except Exception as e:
+                if on_done:
+                    on_done(False, getattr(e, "message", None) or str(e))
+                return False
         try:
-            self._client.set_color(hexv)
-        except KeybackconError as e:
-            self._error(e.message)
-            return False
+            from gui.backend import Intent
+            backend.submit(Intent(kind=kind, payload=payload, on_done=on_done))
+            return True
         except Exception as e:
-            log_exc("fijar color")
-            self._error(str(e))
+            log_exc("encolar backend")
+            if on_done:
+                on_done(False, str(e))
             return False
-        if ok_msg:
-            self._toast(ok_msg)
-        return True
+
+    def _run_set(self, hexv, ok_msg=None):
+        prev = getattr(self, "cur_color", hexv)
+
+        def done(ok, err):
+            if not ok:
+                self.cur_color = prev
+                self._mark_selected()
+                self._refresh_caption()
+                self._error(err or _("No se pudo fijar el color"))
+                return
+            if ok_msg:
+                self._toast(ok_msg)
+
+        return self._backend_submit("set", hexv, done)
 
     def _run_brightness(self, value):
-        try:
-            self._client.set_brightness(value)
-        except KeybackconError as e:
-            self._error(e.message)
-            return False
-        except Exception as e:
-            log_exc("ajustar brillo")
-            self._error(str(e))
-            return False
-        return True
+        def done(ok, err):
+            if not ok:
+                self._error(err or _("No se pudo ajustar el brillo"))
+
+        return self._backend_submit("brightness", value, done)
 
     def _run_stop(self, ok_msg=None):
-        try:
-            self._client.stop()
-        except KeybackconError as e:
-            self._error(e.message)
-            return False
-        except Exception as e:
-            log_exc("parar")
-            self._error(str(e))
-            return False
-        if ok_msg:
-            self._toast(ok_msg)
-        return True
+        def done(ok, err):
+            if not ok:
+                self._error(err or _("No se pudo parar"))
+                return
+            if ok_msg:
+                self._toast(ok_msg)
+
+        return self._backend_submit("stop", None, done)
 
     def _run_animation(self, mode):
-        try:
-            self._client.animation(mode)
-        except KeybackconError as e:
-            self._error(e.message)
-            return False
-        except Exception as e:
-            log_exc("animación")
-            self._error(str(e))
-            return False
-        self._toast(_("Movimiento {mode} en marcha").format(mode=mode_label(mode)))
-        return True
+        def done(ok, err):
+            if not ok:
+                self.preview_mode = "fijar"
+                self._error(err or _("No se pudo arrancar la animación"))
+                return
+            self._toast(_("Movimiento {mode} en marcha").format(mode=mode_label(mode)))
+
+        return self._backend_submit("animation", mode, done)
 
     # --- sincronización de estado (sin subprocess en el bucle GTK) -------
 
@@ -554,6 +590,13 @@ class MesaWindow(Adw.ApplicationWindow):
         name = next((n for n, h in COLORES if h == self.cur_color), "Tu tono")
         self.stage_caption.set_text(f"{_(name)} · #{self.cur_color} · {self.cur_pct}%")
         self.bright_value.set_text(f"{self.cur_pct}%")
+        try:
+            self.bright_scale.update_property(
+                (Gtk.AccessibleProperty.VALUE_TEXT,),
+                (f"{self.cur_pct} %",),
+            )
+        except Exception:
+            pass
 
     # --- eventos de la UI -------------------------------------------------
 
@@ -827,6 +870,12 @@ class MesaWindow(Adw.ApplicationWindow):
             # sigue vivo para reaparecer al instante.
             self.set_visible(False)
             return True
+        backend = getattr(self, "_backend", None)
+        if backend is not None:
+            try:
+                backend.close()
+            except Exception:
+                log_exc("cerrar backend")
         try:
             self._client.stop_animation()
         except Exception:

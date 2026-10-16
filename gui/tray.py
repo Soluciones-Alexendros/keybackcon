@@ -69,6 +69,8 @@ def _normalize_hex(color_hex):
 def _normalize_mode(mode):
     if mode in MODES:
         return mode
+    if mode == "unknown":
+        return "unknown"
     return "fijar"
 
 
@@ -99,6 +101,8 @@ def render_tray_icon(color_hex, mode):
     ctx.paint()
     ctx.set_operator(cairo.OPERATOR_OVER)
     ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+    if mode == "unknown":
+        mode = "fijar"
     if mode == "off":
         ctx.set_source_rgb(0.16, 0.18, 0.22)
         ctx.arc(cx, cy, 20, 0, 2 * math.pi)
@@ -362,9 +366,22 @@ class TrayIndicator:
             pid = None
         if pid:
             if self._mode in ("fijar", "off"):
-                self._mode = "breathe"
+                # No inventar breathe: preferir modo persistido o «desconocido».
+                modo_archivo = None
+                try:
+                    info = getattr(self._client, "info", None)
+                    if callable(info):
+                        data = info()
+                        if isinstance(data, dict):
+                            modo_archivo = data.get("mode")
+                except Exception:
+                    log_exc("modo desde info")
+                if modo_archivo in ("breathe", "rainbow"):
+                    self._mode = modo_archivo
+                else:
+                    self._mode = "unknown"
                 cambio = True
-        elif self._mode in ("breathe", "rainbow"):
+        elif self._mode in ("breathe", "rainbow", "unknown"):
             self._mode = "fijar"
             cambio = True
         if cambio:

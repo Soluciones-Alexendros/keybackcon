@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 1 | Nombre `keybackcon` | Aceptada | Un solo nombre para binario, repo y App ID, con migración heredada desde `kbd-rgb`. |
 | 2 | Cargo con cero dependencias | Aceptada | Binario pequeño y reproducible sin crates externos. |
-| 3 | Instancia única vía pidfile validado | Aceptada | Una sola animación viva, sin matar procesos reciclados. |
+| 3 | Instancia única vía pidfile validado | Mecanismo sustituido por ADR 13 | Invariante: una sola animación viva. El mecanismo `create_new`+pidfile queda sustituido por bloqueo con descriptor (`flock`). |
 | 4 | Brillo por escala RGB persistente | Aceptada | Sin canal de brillo en firmware, el % escala el RGB y persiste. |
 | 5 | GUI: mesa de luz con light-stage | Aceptada | Fijar luz en <2 s con vista previa fiel, sin prueba-error. |
 | 6 | Transporte HID abstracto y parada limpia | Aceptada | `HidTransport` testeable sin hardware y ciclo de vida determinista. |
@@ -20,6 +20,7 @@
 | 10 | Rustdoc, pedantic y benchmarks sin dependencias | Aceptada | Calidad medible (rustdoc, clippy pedantic, bench/property propios) sin `criterion`/`proptest`. |
 | 11 | Cota `HID_IOCTL_MAX_LEN` en el ioctl | Aceptada | Rechazar en construcción lo que el campo size de 14 bits no puede codificar. |
 | 12 | Alineación al canon P0+P1+P2 | Aceptada | Jobs `quality`/`test`/`build`/`smoke`, docs canónicos y Renovate; sin clonar stacks ajenos. |
+| 13 | Exclusión por descriptor y un solo escritor | Aceptada | CLI único escritor; bloqueo `flock`; parada tipada; errno conservado. |
 
 ## 1. Nombre: `keybackcon` / "Keyboard Backlight Controls"
 Un solo nombre corto para binario, repo y App ID (`org.iniciativas.keybackcon`);
@@ -33,12 +34,11 @@ compilación reproducible y binario estático pequeño; el ioctl cabe en
 unas líneas sin crates.
 
 ## 3. Instancia única vía pidfile validado
-`animation` escribe su pid; antes de señalizar se valida con `kill(pid,0)`
-y `/proc/<pid>/cmdline` conteniendo `keybackcon` o `kbd-rgb`. La reserva es
-atómica (`create_new`, sin truncar): si el pidfile ya existe se re-valida
-—vivo → "ya hay una animación en marcha (pid N)", obsoleto → se reclama en
-≤3 intentos—. Motivo: evita matar procesos reciclados y el "teclado loco"
-(dos escritores).
+**Estado: mecanismo sustituido por ADR 13.** El invariante (una sola
+animación viva, sin matar procesos reciclados ni dos escritores) sigue
+vigente. El mecanismo original (`create_new` del pidfile y relleno
+posterior del PID) presentaba una ventana de carrera y queda reemplazado
+por el bloqueo con descriptor descrito en el ADR 13.
 
 ## 4. Brillo por escala RGB persistente
 Sin canal de brillo en el firmware, el porcentaje escala el color base y
@@ -67,7 +67,9 @@ Los fallos viajan como `error::Error { Usage, Invalid, Io }` (`Display` +
 `std::error::Error` + `From<io::Error>`) y `color::ColorError` conserva el
 mensaje del color. Motivo: mantener la identidad de cero dependencias
 (ADR 2) que `clap`/`thiserror` romperían, con el mismo texto en español y los
-mismos códigos de salida (2 uso, 1 error).
+mismos códigos de salida (**0** ayuda pedida / éxito, **2** uso incorrecto,
+**1** error de ejecución). La ayuda solicitada (`--help` / `help`) deja de
+salir con 2 (H-23).
 
 ## 8. Protocolo centralizado en `src/protocol.rs`
 Los bytes del cable (firma `05 59 09 01 A1 01`, IDs 1/5/6, longitudes 23/10
@@ -123,3 +125,20 @@ y árbol `docs/architecture|guides|runbooks`. Renovate en
 `.github/renovate.json` (Cargo + GitHub Actions). Motivo: hablar el mismo
 contrato de flota sin clonar stacks ajenos ni romper la identidad de cero
 dependencias (ADR 2) ni el registro de ADR de este repo.
+
+## 13. Exclusión por descriptor y un solo escritor
+El CLI es el único proceso que escribe en el HID. No hay daemon de sistema
+ni servicio de usuario permanente como segundo escritor. La exclusión de
+animación se mantiene con un descriptor abierto y `flock` (libc, sin crates
+nuevos, ADR 2); el pidfile puede seguir como metadato auxiliar, pero el
+derecho de escritura lo da el bloqueo del descriptor, no la mera existencia
+del fichero. `stop_animation` deja de devolver un `bool` ambiguo: el
+resultado tipado distingue `Detenida`, `SigueViva` y `NoHabia`; si el
+proceso anterior sigue vivo, ningún comando posterior escribe en el
+dispositivo. Los errores HID conservan `raw_os_error()` del `io::Error`
+original antes de añadir el mensaje legible, para que `is_device_gone`
+clasifique correctamente tras el formateo. Si las pruebas multiproceso no
+pueden garantizar un solo escritor, se redacta otro ADR; no se introduce un
+segundo proceso escritor. Motivo: cerrar las carreras del pidfile (H-03,
+H-04) y la pérdida de errno (H-05) sin abandonar el modelo CLI-dueño
+(ADR 9) ni cero dependencias (ADR 2).

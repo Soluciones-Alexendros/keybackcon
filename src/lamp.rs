@@ -1,4 +1,4 @@
-//! Dispositivo `LampArray`: localiza el hidraw por la firma del descriptor,
+//! Dispositivo `LampArray`: localiza el hidraw por firma y perfil USB,
 //! transporta informes con `HidTransport` (`HidRaw` es el único punto con FFI
 //! ioctl) y expone atributos, color y efectos autónomos.
 
@@ -13,9 +13,7 @@ use crate::protocol::{
     REPORT_ID_ATTRS,
 };
 
-// SAFETY: `ioctl` es una función de libc con ABI estable; solo se invoca con el
-// fd de un hidraw abierto por este proceso y un puntero a un buffer vivo
-// durante la llamada (el kernel copia antes de volver).
+// SAFETY: `ioctl` es libc con ABI estable.
 unsafe extern "C" {
     fn ioctl(fd: i32, request: u64, arg: *mut u8) -> i32;
 }
@@ -23,29 +21,52 @@ unsafe extern "C" {
 /// Mensaje de error cuando el teclado se desconecta durante la animación.
 pub const DEVICE_GONE_MSG: &str = "el teclado parece haberse desconectado";
 
+/// VID/PID del AERO X16 admitido (coinciden con la regla udev).
+pub const SUPPORTED_VID: u16 = 0x0414;
+pub const SUPPORTED_PID: u16 = 0x8104;
+
 const ENODEV: i32 = 19;
 const ENXIO: i32 = 6;
 const ENOENT: i32 = 2;
 
+/// Error de informe que conserva el errno original bajo un mensaje legible.
+#[derive(Debug)]
+struct DeviceReportError {
+    code: Option<i32>,
+    msg: String,
+}
+
+impl std::fmt::Display for DeviceReportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.msg)
+    }
+}
+
+impl std::error::Error for DeviceReportError {}
+
 /// Indica si `e` corresponde a un dispositivo desaparecido
-/// (ENODEV/ENXIO/ENOENT).
+/// (ENODEV/ENXIO/ENOENT), incluso tras envolver el mensaje.
 pub fn is_device_gone(e: &io::Error) -> bool {
-    matches!(e.raw_os_error(), Some(ENODEV | ENXIO | ENOENT))
+    if matches!(e.raw_os_error(), Some(ENODEV | ENXIO | ENOENT)) {
+        return true;
+    }
+    e.get_ref()
+        .and_then(|r| r.downcast_ref::<DeviceReportError>())
+        .is_some_and(|d| matches!(d.code, Some(ENODEV | ENXIO | ENOENT)))
 }
 
 fn report_error(path: &Path, action: &str, id: u8, e: &io::Error) -> io::Error {
-    io::Error::new(
-        e.kind(),
-        format!(
-            "no se pudo {action} el informe {id} de {}: {e}",
-            path.display()
-        ),
-    )
+    let msg = format!(
+        "no se pudo {action} el informe {id} de {}: {e}",
+        path.display()
+    );
+    let code = e.raw_os_error();
+    io::Error::new(e.kind(), DeviceReportError { code, msg })
 }
 
 /// Acceso a feature reports HID; permite probar `Lamp` sin hardware.
 pub trait HidTransport {
-    /// Lee `len` bytes del informe `id` (`get_feature`).
+    /// Lee hasta `len` bytes del informe `id` (`get_feature`).
     fn get_feature(&mut self, id: u8, len: usize) -> io::Result<Vec<u8>>;
     /// Escribe un informe completo (`set_feature`).
     fn set_feature(&mut self, report: &[u8]) -> io::Result<()>;
@@ -83,8 +104,7 @@ impl HidTransport for HidRaw {
             .map_err(|e| report_error(&self.path, "leer", id, &e))?;
         let mut buf = vec![0u8; len];
         buf[0] = id;
-        // SAFETY: el buffer tiene exactamente `len` bytes, la petición codifica
-        // ese mismo `len` y el fd sigue abierto mientras dura la llamada.
+        // SAFETY: buffer de `len` bytes; la petición codifica ese `len`.
         let r = unsafe { ioctl(self.file.as_raw_fd(), request, buf.as_mut_ptr()) };
         if r < 0 {
             return Err(report_error(
@@ -94,6 +114,27 @@ impl HidTransport for HidRaw {
                 &io::Error::last_os_error(),
             ));
         }
+        #[allow(clippy::cast_sign_loss)]
+        let got = r as usize;
+        if got == 0 || got > len {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "longitud de informe inválida ({got}) al leer id {id} de {}",
+                    self.path.display()
+                ),
+            ));
+        }
+        buf.truncate(got);
+        if buf.first().copied() != Some(id) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "el informe leído de {} no tiene el id {id} esperado",
+                    self.path.display()
+                ),
+            ));
+        }
         Ok(buf)
     }
 
@@ -101,8 +142,7 @@ impl HidTransport for HidRaw {
         let id = report.first().copied().unwrap_or(0);
         let request = hid_ioctl_request(HIDIOCSFEATURE_NR, report.len())
             .map_err(|e| report_error(&self.path, "escribir", id, &e))?;
-        // SAFETY: la petición codifica exactamente report.len(); el kernel solo
-        // lee el buffer (no lo retiene) y el fd es válido durante la llamada.
+        // SAFETY: petición = report.len(); el kernel solo lee el buffer.
         let r = unsafe { ioctl(self.file.as_raw_fd(), request, report.as_ptr().cast_mut()) };
         if r < 0 {
             return Err(report_error(
@@ -122,15 +162,45 @@ pub struct Lamp<T: HidTransport = HidRaw> {
     count: u16,
 }
 
+/// Lee VID/PID USB del hidraw vía uevent (`HID_ID=bustype:vid:pid`).
+fn usb_ids_for_hidraw(hidraw_name: &str) -> Option<(u16, u16)> {
+    let uevent = PathBuf::from(format!("/sys/class/hidraw/{hidraw_name}/device/uevent"));
+    let text = fs::read_to_string(uevent).ok()?;
+    for line in text.lines() {
+        let Some(rest) = line.strip_prefix("HID_ID=") else {
+            continue;
+        };
+        // Formato típico: 0003:00000414:00008104
+        let parts: Vec<&str> = rest.split(':').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let vid = u16::try_from(u32::from_str_radix(parts[1], 16).ok()?).ok()?;
+        let pid = u16::try_from(u32::from_str_radix(parts[2], 16).ok()?).ok()?;
+        return Some((vid, pid));
+    }
+    None
+}
+
+fn matches_supported_profile(hidraw_name: &str) -> bool {
+    match usb_ids_for_hidraw(hidraw_name) {
+        Some((vid, pid)) => vid == SUPPORTED_VID && pid == SUPPORTED_PID,
+        // Sin uevent legible: no escribir informes específicos.
+        None => false,
+    }
+}
+
 impl Lamp<HidRaw> {
-    /// Busca en `/sys/class/hidraw` el primer descriptor con la firma
-    /// `LampArray` y devuelve su ruta en `/dev`.
+    /// Busca el hidraw con firma `LampArray` y VID/PID admitidos.
     pub fn find() -> io::Result<PathBuf> {
         let mut found: Vec<PathBuf> = Vec::new();
         for e in fs::read_dir("/sys/class/hidraw")? {
             let e = e?;
             let name = e.file_name().to_string_lossy().into_owned();
             if !name.starts_with("hidraw") {
+                continue;
+            }
+            if !matches_supported_profile(&name) {
                 continue;
             }
             let desc = e.path().join(REPORT_DESCRIPTOR_SUBPATH);
@@ -146,7 +216,8 @@ impl Lamp<HidRaw> {
         found.into_iter().next().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotFound,
-                "no se encontró el dispositivo LampArray (¿está cargada la regla udev? mira con 'keybackcon info')",
+                "no se encontró el dispositivo LampArray admitido (VID 0414 / PID 8104); \
+                 ¿está cargada la regla udev? mira con 'keybackcon info'",
             )
         })
     }
@@ -169,6 +240,12 @@ impl<T: HidTransport> Lamp<T> {
     /// Lee el informe de atributos: `(LampCount, LampArrayKind)`.
     pub fn attrs(&mut self) -> io::Result<(u16, u32)> {
         let b = self.dev.get_feature(REPORT_ID_ATTRS, ATTRS_REPORT_LEN)?;
+        if b.len() < ATTRS_REPORT_LEN.min(19) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("informe de atributos demasiado corto ({} bytes)", b.len()),
+            ));
+        }
         parse_attrs(&b)
     }
 
@@ -190,6 +267,7 @@ mod tests {
     struct Fake {
         attrs: Vec<u8>,
         writes: Vec<Vec<u8>>,
+        get_len: Option<usize>,
     }
 
     impl Fake {
@@ -197,12 +275,25 @@ mod tests {
             Fake {
                 attrs,
                 writes: Vec::new(),
+                get_len: None,
             }
         }
     }
 
     impl HidTransport for Fake {
         fn get_feature(&mut self, _id: u8, len: usize) -> io::Result<Vec<u8>> {
+            if let Some(got) = self.get_len {
+                if got == 0 || got > len {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "longitud de informe inválida",
+                    ));
+                }
+                let mut b = vec![0u8; got];
+                let n = self.attrs.len().min(got);
+                b[..n].copy_from_slice(&self.attrs[..n]);
+                return Ok(b);
+            }
             let mut b = vec![0u8; len];
             let n = self.attrs.len().min(len);
             b[..n].copy_from_slice(&self.attrs[..n]);
@@ -217,6 +308,7 @@ mod tests {
 
     fn attrs_buf(count: u16, kind: u32) -> Vec<u8> {
         let mut b = vec![0u8; 23];
+        b[0] = REPORT_ID_ATTRS;
         b[1..3].copy_from_slice(&count.to_le_bytes());
         b[15..19].copy_from_slice(&kind.to_le_bytes());
         b
@@ -265,5 +357,22 @@ mod tests {
         }
         assert!(!is_device_gone(&io::Error::from_raw_os_error(13)));
         assert!(!is_device_gone(&io::Error::other("sin errno")));
+    }
+
+    #[test]
+    fn clasifica_desconexion_tras_envolver_mensaje() {
+        let original = io::Error::from_raw_os_error(ENODEV);
+        let wrapped = report_error(Path::new("/dev/hidraw0"), "escribir", 5, &original);
+        assert!(is_device_gone(&wrapped));
+        assert!(wrapped.to_string().contains("hidraw0"));
+    }
+
+    #[test]
+    fn informe_corto_se_rechaza_en_attrs() {
+        let mut fake = Fake::new(attrs_buf(1, 0));
+        fake.get_len = Some(5);
+        let mut lamp = Lamp::with_transport(fake);
+        let err = lamp.attrs().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
     }
 }

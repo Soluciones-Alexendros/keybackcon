@@ -33,6 +33,7 @@ mod error;
 mod lamp;
 mod protocol;
 mod state;
+mod xdg;
 
 fn main() {
     cli::main();

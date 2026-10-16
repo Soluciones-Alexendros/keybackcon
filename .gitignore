@@ -1,4 +1,5 @@
 /target/
+.pytest-bin/
 TASKS.md
 *.pyc
 __pycache__/

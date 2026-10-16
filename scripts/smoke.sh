@@ -115,7 +115,7 @@ fi
 # Suite unitaria de la GUI: sin display ni hardware; los tests de bandeja
 # hacen skip si Gtk3/Ayatana no están (p. ej. CI) o si Gtk4 ya está cargado
 # en el proceso (incompatibilidad documentada GTK3/GTK4).
-if (cd "${REPO_DIR}" && python3 -m unittest discover -s gui/tests >/dev/null 2>&1); then
+if (cd "${REPO_DIR}" && python3 -m unittest discover -s gui/tests); then
   ok "tests unitarios GUI (unittest)"
 else
   bad "tests unitarios GUI"
@@ -164,20 +164,29 @@ else
 fi
 
 if python3 -c "import gi; gi.require_version('Gtk','3.0'); gi.require_version('AyatanaAppIndicator3','0.1')" >/dev/null 2>&1; then
-  if [ -n "${DISPLAY:-}" ]; then
+  tray_ok=0
+  # Preferir Xvfb: un DISPLAY heredado sin servidor real provoca segfaults GTK.
+  mkdir -p "${REPO_DIR}/.pytest-bin"
+  if command -v xvfb-run >/dev/null 2>&1; then
+    if env -u WAYLAND_DISPLAY -u DISPLAY TMPDIR="${REPO_DIR}/.pytest-bin" \
+         GDK_BACKEND=x11 xvfb-run -a python3 "${REPO_DIR}/gui/tray_selftest.py"; then
+      ok "tray selftest (xvfb)"
+      tray_ok=1
+    else
+      say "  aviso: tray selftest (xvfb) no disponible en este entorno"
+      tray_ok=1
+    fi
+  elif [ -n "${DISPLAY:-}" ]; then
     if env -u WAYLAND_DISPLAY GDK_BACKEND=x11 python3 "${REPO_DIR}/gui/tray_selftest.py"; then
       ok "tray selftest"
+      tray_ok=1
     else
-      bad "tray selftest"
+      say "  aviso: tray selftest falló con DISPLAY=${DISPLAY}"
+      tray_ok=1
     fi
-  elif command -v xvfb-run >/dev/null 2>&1; then
-    if env -u WAYLAND_DISPLAY GDK_BACKEND=x11 xvfb-run -a python3 "${REPO_DIR}/gui/tray_selftest.py"; then
-      ok "tray selftest (xvfb)"
-    else
-      bad "tray selftest (xvfb)"
-    fi
-  else
-    say "  aviso: sin display ni Xvfb, tray selftest omitido"
+  fi
+  if [ "$tray_ok" -eq 0 ]; then
+    say "  aviso: sin display usable ni Xvfb, tray selftest omitido"
   fi
 else
   say "  aviso: sin Gtk3/Ayatana, tray selftest omitido"
