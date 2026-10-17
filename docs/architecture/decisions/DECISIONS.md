@@ -20,7 +20,7 @@
 | 10 | Rustdoc, pedantic y benchmarks sin dependencias | Aceptada | Calidad medible (rustdoc, clippy pedantic, bench/property propios) sin `criterion`/`proptest`. |
 | 11 | Cota `HID_IOCTL_MAX_LEN` en el ioctl | Aceptada | Rechazar en construcción lo que el campo size de 14 bits no puede codificar. |
 | 12 | Alineación al canon P0+P1+P2 | Aceptada | Jobs `quality`/`test`/`build`/`smoke`, docs canónicos y Renovate; sin clonar stacks ajenos. |
-| 13 | Exclusión por descriptor y un solo escritor | Aceptada | CLI único escritor; bloqueo `flock`; parada tipada; errno conservado. |
+| 13 | Exclusión por descriptor y un solo escritor | Aceptada, enmendada | Todo escritor HID toma el mismo `flock` en `/run/keybackcon/writer.lock`. Sin daemon. La sesión activa no es una política adicional. |
 
 ## 1. Nombre: `keybackcon` / "Keyboard Backlight Controls"
 Un solo nombre corto para binario, repo y App ID (`org.iniciativas.keybackcon`);
@@ -127,18 +127,36 @@ contrato de flota sin clonar stacks ajenos ni romper la identidad de cero
 dependencias (ADR 2) ni el registro de ADR de este repo.
 
 ## 13. Exclusión por descriptor y un solo escritor
-El CLI es el único proceso que escribe en el HID. No hay daemon de sistema
-ni servicio de usuario permanente como segundo escritor. La exclusión de
-animación se mantiene con un descriptor abierto y `flock` (libc, sin crates
-nuevos, ADR 2); el pidfile puede seguir como metadato auxiliar, pero el
-derecho de escritura lo da el bloqueo del descriptor, no la mera existencia
-del fichero. `stop_animation` deja de devolver un `bool` ambiguo: el
-resultado tipado distingue `Detenida`, `SigueViva` y `NoHabia`; si el
-proceso anterior sigue vivo, ningún comando posterior escribe en el
-dispositivo. Los errores HID conservan `raw_os_error()` del `io::Error`
-original antes de añadir el mensaje legible, para que `is_device_gone`
-clasifique correctamente tras el formateo. Si las pruebas multiproceso no
-pueden garantizar un solo escritor, se redacta otro ADR; no se introduce un
-segundo proceso escritor. Motivo: cerrar las carreras del pidfile (H-03,
-H-04) y la pérdida de errno (H-05) sin abandonar el modelo CLI-dueño
-(ADR 9) ni cero dependencias (ADR 2).
+
+**Enmienda (estabilización).** El invariante pasa de «una animación» a
+«una escritura HID». Cada comando que abre el dispositivo para escribir
+(`set`, `off`, `brightness`, `firmware-effects`, `restore`, la restauración
+de `stop` y la animación) adquiere el mismo `flock` exclusivo y lo mantiene
+durante la operación y la transición de estado que forma parte de ella.
+Consultar (`info`) no toma el candado y no escribe. No hay daemon
+privilegiado ni un segundo proceso dueño del dispositivo (ADR 9). Sigue
+sin crates nuevos (ADR 2): `flock` y `open` son libc.
+
+El candado es `/run/keybackcon/writer.lock`. `tmpfiles.d` crea el directorio
+`root:keybackcon` modo `0770` y el fichero `root:keybackcon` modo `0660`.
+El grupo `keybackcon` lo declara `sysusers.d` del paquete. La regla udev
+actual no nombra un grupo: solo aplica `TAG+="uaccess"` al `hidraw`. Esa
+regla no cambia a `MODE="0666"` ni a un grupo que abra el dispositivo por
+sí solo. Para escribir hacen falta las dos cosas: abrir el `hidraw` (ACL de
+la sesión) y abrir el candado (miembro del grupo). Si el directorio no
+existe, es un enlace, no pertenece a root o el modo no es el esperado, la
+escritura se rechaza. No hay fallback a `/var/tmp` ni a un fichero `0666`.
+
+El bloqueo es cooperativo: solo excluye a los procesos del producto que lo
+toman. Dos usuarios que puedan abrir el candado se serializan; el segundo
+recibe un error claro y no escribe. Esta enmienda no promete «solo la
+sesión gráfica activa» más allá de la ACL `uaccess` del nodo. El cambio de
+usuario real queda como prueba manual.
+
+La comprobación de que no hay otra animación y la apertura del HID ocurren
+con el candado ya tomado. El pidfile puede anotar el PID de la animación,
+pero no otorga el derecho de escritura. No se promete `pidfd` en esta
+enmienda. Los errores HID conservan `raw_os_error()` del `io::Error`
+original. Motivo de la enmienda: el `flock` vivía solo en la animación y
+en el runtime del usuario, así que un `set` concurrente o la sesión de
+otro usuario quedaban fuera del mismo contrato.

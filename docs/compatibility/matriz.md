@@ -24,9 +24,9 @@ sin certificación), **no soportado** (excluido del alcance anunciado).
 
 | Familia | Versión | CLI | GUI | Canal | Estado |
 |---|---|---|---|---|---|
-| Debian | 12 | Sí | No (libadwaita 1.2 &lt; 1.5) | `.deb` / script | CLI **candidato**; GUI **no soportada** |
+| Debian | 12 | Sí | No (libadwaita 1.2 &lt; 1.5) | `.deb` / script | CLI **candidato**; GUI **no soportada** (exclusión ratificada; no hay vía GTK3) |
 | Debian | 13 | Sí | Si Adw ≥ 1.5 | `.deb` | **candidato** |
-| Ubuntu | 22.04 | Sí | Pendiente de medir Adw | `.deb` / script | CLI **candidato**; GUI CLI-only si Adw &lt; 1.5 |
+| Ubuntu | 22.04 | Sí | No anunciada | `.deb` / script | CLI **candidato**; GUI **no anunciada** hasta medir libadwaita ≥ 1.5 en esa versión |
 | Ubuntu | 24.04 | Sí | Si Adw ≥ 1.5 | `.deb` | **candidato** |
 | Ubuntu | 26.04 | Sí | Si Adw ≥ 1.5 | `.deb` | **candidato** |
 | Fedora | Versión registrada en la release | Sí | Si Adw ≥ 1.5 | script / RPM futuro | **candidato**, empaquetado RPM **no verificado** |
@@ -52,9 +52,21 @@ automática solo con un mecanismo alternativo probado y documentado.
 
 ## Hyprland
 
-Hasta completar el perfil de pruebas (unidad de integración Hyprland):
-**experimental**. No se edita `hyprland.conf` ni Waybar automáticamente.
-Perfiles previstos: con/sin UWSM, con/sin bandeja, con/sin agente polkit.
+Hasta completar el perfil de pruebas (con y sin UWSM, con y sin bandeja,
+con y sin agente polkit): **experimental**. No se edita `hyprland.conf` ni
+Waybar automáticamente. Esta estabilización no lo pasa a soportado.
+
+## Alcance ratificado en la estabilización
+
+- Debian 12: la mesa de luz queda fuera de soporte. El preflight que
+  rechaza libadwaita 1.2 no es una compatibilidad pendiente de recuperar
+  en este cierre.
+- Ubuntu 22.04: el CLI es candidato. La GUI no se anuncia.
+- Varios usuarios: la exclusión mutua del candado en `/run/keybackcon`
+  (ADR 13) es el contrato. No se anuncia una política distinta de «sesión
+  gráfica activa» mientras el dispositivo siga gobernado por `uaccess`.
+- El tag `v2.3.1` no se mueve. Su `Cargo.lock` no coincide con el
+  `Cargo.toml` de ese tag y no es fuente de paquetes nuevos.
 
 ## Hardware
 

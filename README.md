@@ -68,7 +68,7 @@ La mesa de luz necesita **GTK 4** y **libadwaita ≥ 1.5**. La bandeja
 |---|---|---|---|
 | Debian 12 | `.deb` / script | Candidato | No soportada (Adw 1.2) |
 | Debian 13 / Ubuntu 24.04+ | `.deb` / script | Candidato | Candidato si Adw ≥ 1.5 |
-| Ubuntu 22.04 | `.deb` / script | Candidato | Solo si Adw ≥ 1.5; si no, CLI |
+| Ubuntu 22.04 | `.deb` / script | Candidato | No anunciada hasta medir Adw ≥ 1.5 |
 | Arch | script / release | Candidato | Candidato; AUR no acreditado |
 | Fedora | script / npm CLI | Candidato | Candidato; RPM no verificado |
 | openSUSE | — | Fuera del alcance anunciado | — |
