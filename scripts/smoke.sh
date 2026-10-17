@@ -44,6 +44,13 @@ else
   bad "udev"
 fi
 
+if grep -q '/run/keybackcon/writer.lock' "${REPO_DIR}/packaging/tmpfiles.d/keybackcon.conf" \
+  && grep -q '^g keybackcon' "${REPO_DIR}/packaging/sysusers.d/keybackcon.conf"; then
+  ok "candado tmpfiles/sysusers"
+else
+  bad "candado tmpfiles/sysusers"
+fi
+
 if grep -q "ExecStart=/usr/bin/keybackcon restore" "${REPO_DIR}/packaging/systemd/keybackcon.service"; then
   ok "systemd service (/usr/bin)"
 else

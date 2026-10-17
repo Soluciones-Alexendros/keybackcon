@@ -11,6 +11,7 @@ use crate::color::{self, Rgb};
 use crate::error::Error;
 use crate::lamp::Lamp;
 use crate::state;
+use crate::writer;
 
 /// Nombre del binario usado en la ayuda y en los errores.
 pub const BIN: &str = "keybackcon";
@@ -111,6 +112,18 @@ fn require_writer_clear() -> Result<(), Error> {
         )));
     }
     Ok(())
+}
+
+/// Toma el candado y solo entonces abre el HID. `info` no pasa por aquí.
+fn with_hid_write(op: impl FnOnce() -> Result<(), Error>) -> Result<(), Error> {
+    let _guard = writer::WriterGuard::acquire()?;
+    if animation::animation_pid_alive().is_some() {
+        return Err(Error::Io(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "la animación anterior sigue viva; no se abre el dispositivo",
+        )));
+    }
+    op()
 }
 
 /// Valida `args` (sin el nombre del binario) y construye el comando.
@@ -258,7 +271,7 @@ pub fn run() -> Result<(), Error> {
 }
 
 fn cmd_info(json: bool) -> Result<(), Error> {
-    let st = state::load_persisted();
+    let st = state::load_persisted()?;
     let path = Lamp::find()?;
     let mut l = Lamp::open()?;
     let (count, kind) = l.attrs()?;
@@ -308,24 +321,28 @@ fn json_escape(s: &str) -> String {
 }
 
 fn cmd_set(c: Rgb) -> Result<(), Error> {
-    let (_, pct) = state::load_state();
     require_writer_clear()?;
-    state::apply(&mut Lamp::open()?, c, pct)?;
-    Ok(())
+    let (_, pct) = state::load_state()?;
+    with_hid_write(|| {
+        state::apply(&mut Lamp::open()?, c, pct)?;
+        Ok(())
+    })
 }
 
 fn cmd_off() -> Result<(), Error> {
     require_writer_clear()?;
-    let mut l = Lamp::open()?;
-    l.autonomous(false)?;
-    l.color((0, 0, 0))?;
-    state::set_runtime_mode("fijar", "off")?;
-    Ok(())
+    with_hid_write(|| {
+        let mut l = Lamp::open()?;
+        l.autonomous(false)?;
+        l.color((0, 0, 0))?;
+        state::set_runtime_mode("fijar", "off")?;
+        Ok(())
+    })
 }
 
 #[allow(clippy::needless_pass_by_value)]
 fn cmd_brightness(change: BrightnessChange) -> Result<(), Error> {
-    let mut st = state::load_persisted();
+    let mut st = state::load_persisted()?;
     let new = match change {
         BrightnessChange::Set(n) => n,
         BrightnessChange::Up(n) => st.brightness.saturating_add(n),
@@ -334,27 +351,36 @@ fn cmd_brightness(change: BrightnessChange) -> Result<(), Error> {
     .clamp(0, 100);
     st.brightness = new;
     // No detiene la animación: relee el porcentaje (ADR 4).
-    // Si no hay animación, reaplica el color fijo.
+    // Si no hay animación, reaplica el color fijo bajo el candado.
     if animation::animation_pid_alive().is_none() {
-        let mut l = Lamp::open()?;
-        l.autonomous(false)?;
-        l.color(color::scale(st.base_color, new))?;
-        if st.power == "off" {
-            st.power = "on".into();
-            st.mode = "fijar".into();
-        }
+        require_writer_clear()?;
+        let base = st.base_color;
+        with_hid_write(|| {
+            let mut l = Lamp::open()?;
+            l.autonomous(false)?;
+            l.color(color::scale(base, new))?;
+            if st.power == "off" {
+                st.power = "on".into();
+                st.mode = "fijar".into();
+            }
+            state::save_persisted(&st)?;
+            Ok(())
+        })?;
+    } else {
+        state::save_persisted(&st)?;
     }
-    state::save_persisted(&st)?;
     println!("brillo: %{new}");
     Ok(())
 }
 
 fn cmd_firmware_effects(on: bool) -> Result<(), Error> {
     require_writer_clear()?;
-    Lamp::open()?.autonomous(on)?;
     let mode = if on { "firmware" } else { "fijar" };
-    state::set_runtime_mode(mode, "on")?;
-    Ok(())
+    with_hid_write(|| {
+        Lamp::open()?.autonomous(on)?;
+        state::set_runtime_mode(mode, "on")?;
+        Ok(())
+    })
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -368,7 +394,7 @@ fn cmd_animation(mode: Mode, fps: u64) -> Result<(), Error> {
 
 fn cmd_stop() -> Result<(), Error> {
     use animation::StopResult;
-    let (base, pct) = state::load_state();
+    let (base, pct) = state::load_state()?;
     let r = animation::stop_animation();
     match r {
         StopResult::SigueViva => {
@@ -378,7 +404,10 @@ fn cmd_stop() -> Result<(), Error> {
             )));
         }
         StopResult::Detenida => {
-            state::apply(&mut Lamp::open()?, base, pct)?;
+            with_hid_write(|| {
+                state::apply(&mut Lamp::open()?, base, pct)?;
+                Ok(())
+            })?;
             println!("animación detenida; color base restaurado");
         }
         StopResult::NoHabia => {
@@ -403,13 +432,16 @@ pub fn main() {
 }
 
 fn cmd_restore(on_login: bool) -> Result<(), Error> {
-    if on_login && !state::should_restore_on_login() {
+    if on_login && !state::should_restore_on_login()? {
         println!("restauración omitida (restore_policy=never)");
         return Ok(());
     }
-    let (base, pct) = state::load_state();
+    let (base, pct) = state::load_state()?;
     require_writer_clear()?;
-    state::apply(&mut Lamp::open()?, base, pct)?;
+    with_hid_write(|| {
+        state::apply(&mut Lamp::open()?, base, pct)?;
+        Ok(())
+    })?;
     println!(
         "restaurado: #{:02x}{:02x}{:02x} @ %{pct}",
         base.0, base.1, base.2

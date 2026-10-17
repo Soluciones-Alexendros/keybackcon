@@ -61,21 +61,23 @@ autónomo → color → persiste).
 
 ### `animation.rs` — animación exclusiva y parada limpia
 
-Pidfile nuevo + dos rutas heredadas; valida con `kill(pid,0)`, el estado
-`/proc/<pid>/stat` (los zombies cuentan como muertos: su cmdline queda vacío
-pero su pid no reciclable identifica al escritor) y `/proc/<pid>/cmdline`
-(limpia obsoletos/reciclados). `run_animation` señala primero la animación
-anterior, instala SIGINT/SIGTERM y reserva el pidfile en exclusiva con
-`create_new` *antes* de abrir el dispositivo: un fallo de claim no deja el
-teclado sin modo autónomo ni con dos escritores. Si existe, re-valida la
-animación viva o reclama el obsoleto (3 intentos). Los signos solo marcan un
-`AtomicBool`; el bucle relee el estado cada 500 ms y `fps` se acota a
+Pidfile nuevo + dos rutas heredadas. El derecho de escribir no es el
+pidfile: es el `flock` de `/run/keybackcon/writer.lock` (`writer.rs`), el
+mismo que usan `set`, `off`, `brightness`, `firmware-effects`, `restore` y
+`stop` cuando restauran color. `info` no lo toma. Si el directorio no es el
+que instala `tmpfiles.d` (`root:keybackcon`, `0770`) o el fichero no es
+`0660`, la escritura se rechaza. No hay fallback a `/var/tmp`.
+
+La parada sigue validando el pid con `/proc/<pid>/stat` (un zombie no es
+una animación viva) y `/proc/<pid>/cmdline` (un PID reciclado que ya no es
+`keybackcon` no se señaliza). `run_animation` señala primero la animación
+anterior y solo abre el HID con el candado ya tomado. Los signos solo marcan
+un `AtomicBool`; el bucle relee el estado cada 500 ms y `fps` se acota a
 1–`MAX_FPS` (60); al parar restaura el color base y borra su pidfile solo si
-sigue siendo suyo. Si el teclado se desconecta limpia y sale con "el teclado
-parece haberse desconectado". `stop_animation()` señaliza SIGTERM y espera
-(≤1 s): un zombie sin reaped devuelve `true` al instante (para que `stop`
-restaure el color) y si el peer sobrevive al timeout se conserva su pidfile
-en vez de arriesgar dos escritores.
+sigue siendo suyo, antes de soltar el candado. Si el teclado se desconecta
+limpia y sale con "el teclado parece haberse desconectado".
+`stop_animation()` señaliza SIGTERM y espera (≤1 s). Si el peer sobrevive,
+no se abre el dispositivo.
 
 ### `cli.rs` — comandos y despacho
 
@@ -125,8 +127,8 @@ las dependencias en cada familia de paquetes (apt/pacman/dnf/zypper).
 
 | Flujo | Pasos |
 |---|---|
-| `set` / `off` / `brightness` | Detiene animación → autónomo off → emite color → persiste estado |
-| `animation` | Detiene la anterior → reserva pidfile (`create_new`, 3 intentos) → abre dispositivo → bucle (relee estado cada 500 ms) → al parar restaura base y borra su pidfile |
-| `stop` | Señaliza SIGTERM a la animación viva y espera (≤1 s); un zombie cuenta como "había animación" para restaurar el color; si el peer sobrevive, conserva el pidfile |
+| `set` / `off` / `brightness` | Si va a escribir en el HID, toma `/run/keybackcon/writer.lock`, abre el dispositivo y persiste. El brillo no detiene una animación viva (ADR 4): en ese caso solo guarda el porcentaje. |
+| `animation` | Detiene la anterior → toma el candado → anota el pidfile → abre el dispositivo → bucle (relee estado cada 500 ms) → al parar restaura la base, borra su pidfile y suelta el candado |
+| `stop` | Señaliza SIGTERM y espera (≤1 s). Si la animación muere, restaura el color con el candado tomado. Si sigue viva, no abre el dispositivo. |
 | `restore` | Lee estado guardado → `apply` (autónomo off → color) |
 | GUI (vista previa y estado) | Invoca al CLI por subproceso + lee state/pidfile (nunca toca hidraw) |

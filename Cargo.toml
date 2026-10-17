@@ -47,6 +47,8 @@ assets = [
     ["packaging/desktop/keybackcon.desktop", "usr/share/applications/keybackcon.desktop", "644"],
     ["assets/icons/keybackcon.svg", "usr/share/icons/hicolor/scalable/apps/keybackcon.svg", "644"],
     ["packaging/udev/70-keybackcon.rules", "usr/lib/udev/rules.d/70-keybackcon.rules", "644"],
+    ["packaging/tmpfiles.d/keybackcon.conf", "usr/lib/tmpfiles.d/keybackcon.conf", "644"],
+    ["packaging/sysusers.d/keybackcon.conf", "usr/lib/sysusers.d/keybackcon.conf", "644"],
     ["packaging/systemd/*.service", "usr/lib/systemd/user/", "644"],
     ["gui/locale/es/LC_MESSAGES/keybackcon.mo", "usr/share/locale/es/LC_MESSAGES/keybackcon.mo", "644"],
     ["gui/org.iniciativas.keybackcon.gschema.xml", "usr/share/glib-2.0/schemas/org.iniciativas.keybackcon.gschema.xml", "644"],

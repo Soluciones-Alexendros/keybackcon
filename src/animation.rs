@@ -1,13 +1,11 @@
-//! Animación en primer plano (`breathe`/`rainbow`), exclusión por descriptor
-//! y parada tipada (ADR 13).
+//! Animación en primer plano (`breathe`/`rainbow`) y parada tipada (ADR 13).
 //!
-//! El derecho de escritura lo da un `flock` exclusivo sobre
-//! `$XDG_RUNTIME_DIR/keybackcon/animation.lock`. El pidfile sigue como
-//! metadato auxiliar para señalizar y para clientes que consultan el PID.
+//! El derecho de escritura lo da el candado común
+//! `/run/keybackcon/writer.lock` ([`crate::writer`]). El pidfile solo anota
+//! el PID mientras ese candado está tomado; no otorga el derecho de escribir.
 
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Write};
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -15,20 +13,17 @@ use std::time::{Duration, Instant};
 use crate::color::{hsv, scale};
 use crate::lamp::{is_device_gone, Lamp, DEVICE_GONE_MSG};
 use crate::state;
+use crate::writer::WriterGuard;
 use crate::xdg;
 
-// SAFETY: signal, kill y flock son libc con ABI estable.
+// SAFETY: signal y kill son libc con ABI estable.
 unsafe extern "C" {
     fn signal(signum: i32, handler: extern "C" fn(i32)) -> usize;
     fn kill(pid: i32, sig: i32) -> i32;
-    fn flock(fd: i32, op: i32) -> i32;
 }
 
 const SIGINT: i32 = 2;
 const SIGTERM: i32 = 15;
-const LOCK_EX: i32 = 2;
-const LOCK_NB: i32 = 4;
-const LOCK_UN: i32 = 8;
 /// Máximo de fotogramas por segundo.
 pub const MAX_FPS: u64 = 60;
 
@@ -78,10 +73,6 @@ fn runtime_keybackcon_dir() -> PathBuf {
 /// Ruta del pidfile de la animación.
 pub fn pid_file() -> PathBuf {
     runtime_keybackcon_dir().join("animation.pid")
-}
-
-fn lock_file_path() -> PathBuf {
-    runtime_keybackcon_dir().join("animation.lock")
 }
 
 fn legacy_pid_files() -> Vec<PathBuf> {
@@ -222,63 +213,39 @@ fn remove_own_pidfile(path: &Path, own: i32) {
     }
 }
 
-/// Bloqueo de exclusión mantenido mientras el descriptor vive (ADR 13).
+/// Candado de escritura más el pidfile anotado mientras ese candado vive.
 #[derive(Debug)]
 struct AnimationLock {
-    file: File,
+    guard: Option<WriterGuard>,
     pid_path: PathBuf,
     own: i32,
 }
 
+fn write_own_pid(path: &Path, own: i32) -> io::Result<()> {
+    if let Some(parent) = path.parent() {
+        xdg::ensure_private_dir(parent)?;
+    }
+    let mut file = xdg::open_lock_file(path)?;
+    file.set_len(0)?;
+    writeln!(file, "{own}").map_err(|e| {
+        let _ = fs::remove_file(path);
+        io::Error::new(
+            e.kind(),
+            format!("no se pudo escribir {}: {e}", path.display()),
+        )
+    })
+}
+
 impl AnimationLock {
     fn claim(own: i32) -> io::Result<Self> {
-        let lock_path = lock_file_path();
-        let file = xdg::open_lock_file(&lock_path)?;
-        // SAFETY: fd del fichero que acabamos de abrir; LOCK_EX|LOCK_NB.
-        let rc = unsafe { flock(file.as_raw_fd(), LOCK_EX | LOCK_NB) };
-        if rc != 0 {
-            let e = io::Error::last_os_error();
-            return Err(io::Error::new(
-                io::ErrorKind::AlreadyExists,
-                format!(
-                    "ya hay una animación en marcha (no se pudo obtener {}): {e}",
-                    lock_path.display()
-                ),
-            ));
-        }
+        let guard = WriterGuard::acquire()?;
         let pid_path = pid_file();
-        if let Some(parent) = pid_path.parent() {
-            xdg::ensure_private_dir(parent)?;
-        }
-        {
-            let mut f = fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&pid_path)
-                .map_err(|e| {
-                    // SAFETY: liberar el flock si falla el metadato.
-                    unsafe {
-                        let _ = flock(file.as_raw_fd(), LOCK_UN);
-                    }
-                    io::Error::new(
-                        e.kind(),
-                        format!("no se pudo escribir {}: {e}", pid_path.display()),
-                    )
-                })?;
-            if let Err(e) = writeln!(f, "{own}") {
-                let _ = fs::remove_file(&pid_path);
-                unsafe {
-                    let _ = flock(file.as_raw_fd(), LOCK_UN);
-                }
-                return Err(io::Error::new(
-                    e.kind(),
-                    format!("no se pudo escribir {}: {e}", pid_path.display()),
-                ));
-            }
+        if let Err(e) = write_own_pid(&pid_path, own) {
+            drop(guard);
+            return Err(e);
         }
         Ok(Self {
-            file,
+            guard: Some(guard),
             pid_path,
             own,
         })
@@ -288,18 +255,14 @@ impl AnimationLock {
 impl Drop for AnimationLock {
     fn drop(&mut self) {
         remove_own_pidfile(&self.pid_path, self.own);
-        // SAFETY: liberar el flock del descriptor propio.
-        unsafe {
-            let _ = flock(self.file.as_raw_fd(), LOCK_UN);
-        }
+        drop(self.guard.take());
     }
 }
 
 /// Ejecuta `mode` (`breathe`/`rainbow`) a `fps` (1–60).
 ///
-/// Orden: parar la anterior; si sigue viva, abortar sin abrir el HID; reclamar
-/// el flock; abrir el dispositivo. El `Drop` del bloqueo limpia en cualquier
-/// salida.
+/// Orden: parar la anterior; si sigue viva, abortar sin abrir el HID; tomar el
+/// candado común; revalidar; abrir el dispositivo. El `Drop` suelta el candado.
 pub fn run_animation(mode: &str, fps: u64) -> io::Result<()> {
     match stop_animation() {
         StopResult::SigueViva => {
@@ -315,23 +278,29 @@ pub fn run_animation(mode: &str, fps: u64) -> io::Result<()> {
     STOP.store(false, Ordering::SeqCst);
     install_signal_handlers();
     let lock = AnimationLock::claim(own)?;
+    if animation_pid_alive().is_some_and(|pid| pid != own) {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "la animación anterior sigue viva; no se abre el dispositivo",
+        ));
+    }
 
     let mut lamp = Lamp::open()?;
     lamp.autonomous(false)?;
 
     let dt = Duration::from_micros(1_000_000 / fps.clamp(1, MAX_FPS));
     let t0 = Instant::now();
-    let (mut base, mut pct) = state::load_state();
+    let (mut base, mut pct) = state::load_state()?;
     let mut refreshed = Instant::now();
     let result = (|| -> io::Result<()> {
         loop {
             if STOP.load(Ordering::SeqCst) {
-                let (b, p) = state::load_state();
+                let (b, p) = state::load_state()?;
                 let _ = lamp.color(scale(b, p));
                 return Ok(());
             }
             if refreshed.elapsed() >= Duration::from_millis(500) {
-                let (b, p) = state::load_state();
+                let (b, p) = state::load_state()?;
                 base = b;
                 pct = p;
                 refreshed = Instant::now();
@@ -362,11 +331,34 @@ pub fn run_animation(mode: &str, fps: u64) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
     use std::os::unix::process::CommandExt;
     use std::process::{Child, Command};
     use std::sync::MutexGuard;
 
-    fn tmp_runtime(tag: &str) -> (PathBuf, MutexGuard<'static, ()>) {
+    struct RuntimeEnv {
+        _lock: MutexGuard<'static, ()>,
+        prev_runtime: Option<std::ffi::OsString>,
+        prev_writer: Option<std::ffi::OsString>,
+    }
+
+    impl Drop for RuntimeEnv {
+        fn drop(&mut self) {
+            // SAFETY: el mutex de tests sigue tomado hasta el final de este drop.
+            unsafe {
+                match self.prev_runtime.take() {
+                    Some(v) => std::env::set_var("XDG_RUNTIME_DIR", v),
+                    None => std::env::remove_var("XDG_RUNTIME_DIR"),
+                }
+                match self.prev_writer.take() {
+                    Some(v) => std::env::set_var("KEYBACKCON_WRITER_LOCK", v),
+                    None => std::env::remove_var("KEYBACKCON_WRITER_LOCK"),
+                }
+            }
+        }
+    }
+
+    fn tmp_runtime(tag: &str) -> (PathBuf, RuntimeEnv) {
         let guard = crate::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -375,12 +367,37 @@ mod tests {
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(dir.join("keybackcon")).expect("crear runtime de prueba");
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(dir.join("keybackcon"))
+            .expect("crear runtime de prueba");
+        let lock = dir.join("writer.lock");
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .mode(0o660)
+            .open(&lock)
+            .expect("candado de prueba");
+        file.set_permissions(fs::Permissions::from_mode(0o660))
+            .unwrap();
+        let prev_runtime = std::env::var_os("XDG_RUNTIME_DIR");
+        let prev_writer = std::env::var_os("KEYBACKCON_WRITER_LOCK");
         // SAFETY: TEST_ENV_LOCK serializa el entorno.
         unsafe {
             std::env::set_var("XDG_RUNTIME_DIR", &dir);
+            std::env::set_var("KEYBACKCON_WRITER_LOCK", &lock);
         }
-        (dir, guard)
+        (
+            dir,
+            RuntimeEnv {
+                _lock: guard,
+                prev_runtime,
+                prev_writer,
+            },
+        )
     }
 
     fn live_keybackcon_child() -> Child {
@@ -444,6 +461,22 @@ mod tests {
             }
             StopResult::NoHabia => panic!("esperaba Detenida o SigueViva"),
         }
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn pid_reciclado_no_se_senala() {
+        let (tmp, _env) = tmp_runtime("reciclado");
+        let mut child = Command::new("sleep").arg("30").spawn().unwrap();
+        let pid = child.id().cast_signed();
+        fs::write(tmp.join("keybackcon/animation.pid"), pid.to_string()).unwrap();
+        assert_eq!(stop_animation(), StopResult::NoHabia);
+        assert!(
+            Path::new(&format!("/proc/{pid}")).exists(),
+            "un PID reciclado que ya no es keybackcon no se señaliza"
+        );
+        let _ = child.kill();
+        let _ = child.wait();
         let _ = fs::remove_dir_all(&tmp);
     }
 

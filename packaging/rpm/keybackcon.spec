@@ -31,6 +31,8 @@ install -m644 gui/*.py %{buildroot}%{_datadir}/keybackcon/gui/
 install -D -m644 packaging/desktop/keybackcon.desktop %{buildroot}%{_datadir}/applications/keybackcon.desktop
 install -D -m644 assets/icons/keybackcon.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/keybackcon.svg
 install -D -m644 packaging/udev/70-keybackcon.rules %{buildroot}%{_prefix}/lib/udev/rules.d/70-keybackcon.rules
+install -D -m644 packaging/tmpfiles.d/keybackcon.conf %{buildroot}%{_prefix}/lib/tmpfiles.d/keybackcon.conf
+install -D -m644 packaging/sysusers.d/keybackcon.conf %{buildroot}%{_prefix}/lib/sysusers.d/keybackcon.conf
 install -D -m644 packaging/systemd/keybackcon.service %{buildroot}%{_userunitdir}/keybackcon.service
 install -D -m644 packaging/systemd/keybackcon-animation@.service %{buildroot}%{_userunitdir}/keybackcon-animation@.service
 install -D -m644 gui/locale/es/LC_MESSAGES/keybackcon.mo %{buildroot}%{_datadir}/locale/es/LC_MESSAGES/keybackcon.mo
@@ -44,6 +46,8 @@ install -D -m644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
 %{_datadir}/applications/keybackcon.desktop
 %{_datadir}/icons/hicolor/scalable/apps/keybackcon.svg
 %{_prefix}/lib/udev/rules.d/70-keybackcon.rules
+%{_prefix}/lib/tmpfiles.d/keybackcon.conf
+%{_prefix}/lib/sysusers.d/keybackcon.conf
 %{_userunitdir}/keybackcon.service
 %{_userunitdir}/keybackcon-animation@.service
 %{_datadir}/locale/es/LC_MESSAGES/keybackcon.mo

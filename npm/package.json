@@ -34,6 +34,8 @@
     "bin/keybackcon.js",
     "install.js",
     "udev/70-keybackcon.rules",
+    "tmpfiles.d/keybackcon.conf",
+    "sysusers.d/keybackcon.conf",
     "systemd/keybackcon.service",
     "systemd/keybackcon-animation@.service",
     "README.md"

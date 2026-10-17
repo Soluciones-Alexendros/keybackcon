@@ -2,7 +2,7 @@
 //! con lectura heredada de `kbd-rgb/state` y del formato plano `<hex> <pct>`.
 
 use std::fs;
-use std::io::{self, Write};
+use std::io;
 use std::path::PathBuf;
 
 use crate::color::{self, Rgb};
@@ -37,17 +37,17 @@ impl Default for PersistedState {
     }
 }
 
-fn state_base() -> PathBuf {
-    xdg::state_base().unwrap_or_else(|_| PathBuf::from("/var/tmp/keybackcon-state-fallback"))
+fn state_base() -> io::Result<PathBuf> {
+    xdg::state_base()
 }
 
-/// Ruta del estado nuevo.
-pub fn state_file() -> PathBuf {
-    state_base().join("keybackcon/state")
+/// Ruta del estado nuevo. Falla si no hay `HOME` ni `XDG_STATE_HOME` absolutos.
+pub fn state_file() -> io::Result<PathBuf> {
+    Ok(state_base()?.join("keybackcon/state"))
 }
 
-fn legacy_state_file() -> PathBuf {
-    state_base().join("kbd-rgb/state")
+fn legacy_state_file() -> io::Result<PathBuf> {
+    Ok(state_base()?.join("kbd-rgb/state"))
 }
 
 fn parse_legacy_line(raw: &str) -> Option<(Rgb, u32)> {
@@ -93,27 +93,41 @@ fn parse_versioned(raw: &str) -> Option<PersistedState> {
 }
 
 /// Carga el estado completo; migra el formato plano si hace falta.
-pub fn load_persisted() -> PersistedState {
-    let raw = fs::read_to_string(state_file())
-        .or_else(|_| fs::read_to_string(legacy_state_file()))
-        .unwrap_or_default();
+///
+/// Un fichero ausente es el estado por defecto. Un entorno sin ruta XDG
+/// absoluta es un error: no se usa `/var/tmp`.
+pub fn load_persisted() -> io::Result<PersistedState> {
+    let primary = state_file()?;
+    let raw = match fs::read_to_string(&primary) {
+        Ok(s) => s,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            match fs::read_to_string(legacy_state_file()?) {
+                Ok(s) => s,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                    return Ok(PersistedState::default());
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Err(e) => return Err(e),
+    };
     if let Some(st) = parse_versioned(&raw) {
-        return st;
+        return Ok(st);
     }
     if let Some((c, p)) = parse_legacy_line(&raw) {
-        return PersistedState {
+        return Ok(PersistedState {
             base_color: c,
             brightness: p,
             ..PersistedState::default()
-        };
+        });
     }
-    PersistedState::default()
+    Ok(PersistedState::default())
 }
 
 /// Carga `(color base, pct)` — compatibilidad con el API anterior.
-pub fn load_state() -> (Rgb, u32) {
-    let st = load_persisted();
-    (st.base_color, st.brightness)
+pub fn load_state() -> io::Result<(Rgb, u32)> {
+    let st = load_persisted()?;
+    Ok((st.base_color, st.brightness))
 }
 
 fn serialize(st: &PersistedState) -> String {
@@ -130,7 +144,7 @@ fn serialize(st: &PersistedState) -> String {
 
 /// Persiste el estado de forma atómica. Devuelve error si falla la escritura.
 pub fn save_persisted(st: &PersistedState) -> io::Result<()> {
-    let p = state_file();
+    let p = state_file()?;
     let Some(d) = p.parent() else {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -153,19 +167,17 @@ pub fn save_persisted(st: &PersistedState) -> io::Result<()> {
 }
 
 /// Persiste color base y porcentaje (conserva modo/power/restore).
-#[allow(dead_code)] // API pública para GUI/scripts y tests.
-pub fn save_state(rgb: Rgb, pct: u32) {
-    let mut st = load_persisted();
+#[allow(dead_code)] // API de tests y de quien enlace el binario como librería de comandos.
+pub fn save_state(rgb: Rgb, pct: u32) -> io::Result<()> {
+    let mut st = load_persisted()?;
     st.base_color = rgb;
     st.brightness = pct.clamp(0, 100);
-    if let Err(e) = save_persisted(&st) {
-        let _ = writeln!(io::stderr(), "aviso: {e}");
-    }
+    save_persisted(&st)
 }
 
 /// Actualiza solo el modo (y power si aplica) tras una operación confirmada.
 pub fn set_runtime_mode(mode: &str, power: &str) -> io::Result<()> {
-    let mut st = load_persisted();
+    let mut st = load_persisted()?;
     st.mode = mode.to_string();
     st.power = power.to_string();
     save_persisted(&st)
@@ -175,7 +187,7 @@ pub fn set_runtime_mode(mode: &str, power: &str) -> io::Result<()> {
 pub fn apply(l: &mut Lamp, base: Rgb, pct: u32) -> io::Result<()> {
     l.autonomous(false)?;
     l.color(color::scale(base, pct))?;
-    let mut st = load_persisted();
+    let mut st = load_persisted()?;
     st.base_color = base;
     st.brightness = pct.clamp(0, 100);
     st.power = "on".into();
@@ -185,9 +197,9 @@ pub fn apply(l: &mut Lamp, base: Rgb, pct: u32) -> io::Result<()> {
 }
 
 /// Indica si la restauración al login debe ejecutarse.
-pub fn should_restore_on_login() -> bool {
-    let st = load_persisted();
-    st.restore_policy != "never"
+pub fn should_restore_on_login() -> io::Result<bool> {
+    let st = load_persisted()?;
+    Ok(st.restore_policy != "never")
 }
 
 #[cfg(test)]
@@ -207,7 +219,7 @@ mod tests {
         unsafe {
             std::env::set_var("XDG_STATE_HOME", &tmp);
         }
-        let (c, p) = load_state();
+        let (c, p) = load_state().unwrap();
         assert_eq!((c, p), ((255, 120, 0), 60));
         let _ = fs::remove_dir_all(&tmp);
         unsafe {
@@ -226,17 +238,47 @@ mod tests {
         unsafe {
             std::env::set_var("XDG_STATE_HOME", &tmp);
         }
-        save_state((255, 120, 0), 60);
-        assert_eq!(load_state(), ((255, 120, 0), 60));
+        save_state((255, 120, 0), 60).unwrap();
+        assert_eq!(load_state().unwrap(), ((255, 120, 0), 60));
         let raw = fs::read_to_string(tmp.join("keybackcon/state")).unwrap();
         assert!(raw.contains("schema_version=1"));
         assert!(raw.contains("base_color=ff7800"));
         set_runtime_mode("breathe", "on").unwrap();
-        let st = load_persisted();
+        let st = load_persisted().unwrap();
         assert_eq!(st.mode, "breathe");
         let _ = fs::remove_dir_all(&tmp);
         unsafe {
             std::env::remove_var("XDG_STATE_HOME");
+        }
+    }
+
+    #[test]
+    fn t07_sin_xdg_no_hay_fallback_compartido() {
+        let _env = crate::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let prev_home = std::env::var_os("HOME");
+        let prev_xdg = std::env::var_os("XDG_STATE_HOME");
+        // SAFETY: TEST_ENV_LOCK serializa el entorno; se restaura al salir.
+        unsafe {
+            std::env::remove_var("XDG_STATE_HOME");
+            std::env::set_var("HOME", "relativo/no-absoluto");
+        }
+        let err = state_file().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound, "{err}");
+        assert!(
+            !err.to_string().contains("/var/tmp"),
+            "no debe aparecer un fallback compartido: {err}"
+        );
+        unsafe {
+            match prev_home {
+                Some(v) => std::env::set_var("HOME", v),
+                None => std::env::remove_var("HOME"),
+            }
+            match prev_xdg {
+                Some(v) => std::env::set_var("XDG_STATE_HOME", v),
+                None => std::env::remove_var("XDG_STATE_HOME"),
+            }
         }
     }
 }

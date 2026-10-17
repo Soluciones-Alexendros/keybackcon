@@ -151,6 +151,22 @@ else
   sudo udevadm trigger --subsystem-match=hidraw || true
 fi
 
+if [ "${KEYBACKCON_SKIP_UDEV:-0}" != "1" ]; then
+  echo "==> keybackcon: grupo y candado de escritura (pide sudo)"
+  sudo install -D -m644 "${REPO_DIR}/packaging/sysusers.d/keybackcon.conf" /usr/lib/sysusers.d/keybackcon.conf
+  sudo install -D -m644 "${REPO_DIR}/packaging/tmpfiles.d/keybackcon.conf" /usr/lib/tmpfiles.d/keybackcon.conf
+  if command -v systemd-sysusers >/dev/null 2>&1; then
+    sudo systemd-sysusers keybackcon.conf || true
+  fi
+  if command -v systemd-tmpfiles >/dev/null 2>&1; then
+    sudo systemd-tmpfiles --create keybackcon.conf || true
+  fi
+  if ! id -nG "${USER}" | tr ' ' '\n' | grep -qx keybackcon; then
+    sudo usermod -aG keybackcon "${USER}" || true
+    echo "==> keybackcon: sesión nueva para usar el grupo keybackcon"
+  fi
+fi
+
 echo "==> keybackcon: migrar estado heredado kbd-rgb (si existe)"
 for d in "${XDG_STATE_HOME:-${HOME}/.local/state}" "${HOME}/.local/state"; do
   if [ -f "$d/kbd-rgb/state" ] && [ ! -f "$d/keybackcon/state" ]; then
