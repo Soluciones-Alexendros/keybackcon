@@ -76,7 +76,12 @@ jobs:
             --title "chore(release): v$NEW" \
             --body "Sincroniza versiones a v$NEW. Tras el merge, el job tag-after-merge crea el tag y dispara Release/NPM.")"
           PR_NUM="${PR_URL##*/}"
-          gh pr merge "$PR_NUM" --auto --merge --delete-branch
+          # Push con GITHUB_TOKEN no dispara CI. Sin esos checks el
+          # auto-merge no arranca. Rebase: main exige historia lineal y
+          # el mensaje «chore(release): prepara v…» tiene que llegar
+          # intacto para que tag-after-merge cree el tag.
+          gh workflow run CI --ref "$BRANCH"
+          gh pr merge "$PR_NUM" --auto --rebase --delete-branch
 
   tag-after-merge:
     # Solo commits de preparación de release ya en main.

@@ -12,12 +12,10 @@ qué). Los hitos ya logrados van al final como histórico.
 
 ## En curso
 
-Versionado automático de los `feat` que ya están en `main` y todavía no
-tienen tag en esta historia (`5234969`, `dd191bc`). v2.3.0 y v2.3.1 están
-publicadas. El tag `v2.3.1` (`de3a65d`) no es ancestro de `main`; en `main`
-la cadena 2.3.1 entró con `8bbdf37`. El bump lo calcula `version.yml` al
-empujar a `main`. No se fuerza el número ni se mueve el tag. AUR y la
-primera instalación npm siguen en el corto plazo.
+Nada listo para trabajar. v2.4.0 está etiquetada en `main` (`b3d02c4`) y
+el Release publicó `.deb`, tarball y SBOM. El siguiente patch lo abre
+`version.yml` cuando entra un `fix` (el de `getgrnam` en aarch64). AUR y
+npm siguen en el corto plazo.
 
 ## Corto plazo
 
@@ -63,3 +61,4 @@ primera instalación npm siguen en el corto plazo.
 - [x] v2.2.0 — comando restore, lanzador GUI por paquete, GUI acabada y empaquetado al día
 - [x] v2.2.1 — restore systemd `/usr/bin`, udev argv seguro, CLI endurecido, CI MSRV
 - [x] v2.3.0 (código) — parada sin bloqueos (zombies), estado atómico, validación estricta, `info --json`, cap de FPS, semántica de stop unificada, bandeja rediseñada, ventana Adwaita con apertura instantánea desde la bandeja (control D-Bus), autoversionado git-cliff, publicación npm, tests unitarios de la GUI (47) y compatibilidad multi-distribución
+- [x] v2.4.0 — un solo escritor HID, tag en la historia de `main`, `.deb` + tarball + SBOM en GitHub Releases

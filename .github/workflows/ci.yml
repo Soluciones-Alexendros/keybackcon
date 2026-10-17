@@ -7,6 +7,10 @@ concurrency:
 on:
   push:
   pull_request:
+  # Versionado lo dispara tras crear la rama de release: ese push usa
+  # GITHUB_TOKEN y no encola workflows. Los checks de este SHA son los
+  # que main exige para el auto-merge.
+  workflow_dispatch:
 
 permissions:
   contents: read
