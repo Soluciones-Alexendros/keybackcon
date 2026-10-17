@@ -12,19 +12,18 @@ qué). Los hitos ya logrados van al final como histórico.
 
 ## En curso
 
-Nada listo para trabajar. v2.4.0 está etiquetada en `main` (`b3d02c4`) y
-el Release publicó `.deb`, tarball y SBOM. El siguiente patch lo abre
-`version.yml` cuando entra un `fix` (el de `getgrnam` en aarch64). AUR y
-npm siguen en el corto plazo.
+Nada listo para trabajar. v2.4.1 está en `main`, en GitHub Releases y en
+npm. El versionado etiqueta desde el mismo job que abre el PR, porque el
+merge del bot no vuelve a disparar el workflow.
 
 ## Corto plazo
 
 - [ ] **Publicar en AUR** — el `PKGBUILD` está listo; falta rellenar
       `sha256sums` reales (`updpkgsums`), generar `.SRCINFO`
       (`makepkg --printsrcinfo`) y subir con cuenta AUR. Bloqueado: cuenta.
-- [ ] **Primer release npm real** — `npm install -g keybackcon` de prueba en
-      una máquina limpia (Debian y Arch) validando el postinstalador.
-      Bloqueado: `NPM_TOKEN` en GitHub Secrets.
+- [ ] **Prueba de `npm install -g` en máquina limpia** — v2.4.1 ya está en
+      el registry. Falta instalarlo en un Debian y un Arch vacíos y
+      comprobar el postinstalador.
 - [ ] **CI: tests de la GUI** — la suite `gui/tests` ya corre en el job
       `gui-packaging`; añadir cobertura de `main.py` (D-Bus de control) con
       un bus de sesión de prueba si se ve útil.
@@ -62,3 +61,4 @@ npm siguen en el corto plazo.
 - [x] v2.2.1 — restore systemd `/usr/bin`, udev argv seguro, CLI endurecido, CI MSRV
 - [x] v2.3.0 (código) — parada sin bloqueos (zombies), estado atómico, validación estricta, `info --json`, cap de FPS, semántica de stop unificada, bandeja rediseñada, ventana Adwaita con apertura instantánea desde la bandeja (control D-Bus), autoversionado git-cliff, publicación npm, tests unitarios de la GUI (47) y compatibilidad multi-distribución
 - [x] v2.4.0 — un solo escritor HID, tag en la historia de `main`, `.deb` + tarball + SBOM en GitHub Releases
+- [x] v2.4.1 — `getgrnam` portable (aarch64), paquete npm publicado

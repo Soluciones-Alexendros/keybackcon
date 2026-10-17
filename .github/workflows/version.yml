@@ -76,12 +76,36 @@ jobs:
             --title "chore(release): v$NEW" \
             --body "Sincroniza versiones a v$NEW. Tras el merge, el job tag-after-merge crea el tag y dispara Release/NPM.")"
           PR_NUM="${PR_URL##*/}"
-          # Push con GITHUB_TOKEN no dispara CI. Sin esos checks el
-          # auto-merge no arranca. Rebase: main exige historia lineal y
-          # el mensaje «chore(release): prepara v…» tiene que llegar
-          # intacto para que tag-after-merge cree el tag.
+          # Push con GITHUB_TOKEN no dispara CI ni, tras el merge del
+          # bot, un Versionado nuevo. Rebase conserva el mensaje. Este
+          # job espera el merge y etiqueta: si no, el tag no se crea.
           gh workflow run CI --ref "$BRANCH"
           gh pr merge "$PR_NUM" --auto --rebase --delete-branch
+          state=""
+          for _ in $(seq 1 40); do
+            state="$(gh pr view "$PR_NUM" --json state --jq .state)"
+            [ "$state" = "MERGED" ] && break
+            sleep 30
+          done
+          if [ "$state" != "MERGED" ]; then
+            echo "PR $PR_NUM sin fusionar; no se etiqueta"
+            exit 0
+          fi
+          git fetch origin main
+          TIP="$(git rev-parse origin/main)"
+          MSG="$(git log -1 --format=%s "$TIP")"
+          if [ "$MSG" != "chore(release): prepara v$NEW" ]; then
+            echo "main ($MSG) no es el commit de v$NEW"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$NEW" >/dev/null; then
+            echo "el tag v$NEW ya existe"
+            exit 0
+          fi
+          git tag "v$NEW" "$TIP"
+          git push origin "v$NEW"
+          gh workflow run Release --ref "v$NEW"
+          gh workflow run NPM --ref "v$NEW"
 
   tag-after-merge:
     # Solo commits de preparación de release ya en main.
