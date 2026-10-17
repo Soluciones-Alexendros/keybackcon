@@ -3,6 +3,7 @@
 //! Quien no puede abrir esa ruta de forma segura no abre el dispositivo.
 //! No hay fallback a `/var/tmp` ni a un fichero `0666`.
 
+use std::ffi::c_char;
 use std::fs::{self, File};
 use std::io;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -12,7 +13,8 @@ use std::path::{Path, PathBuf};
 // SAFETY: flock y getgrnam son libc con ABI estable.
 unsafe extern "C" {
     fn flock(fd: i32, op: i32) -> i32;
-    fn getgrnam(name: *const i8) -> *mut Group;
+    // c_char: en aarch64 es u8; un *const i8 no compila.
+    fn getgrnam(name: *const c_char) -> *mut Group;
 }
 
 const LOCK_EX: i32 = 2;
@@ -23,10 +25,10 @@ const O_NOFOLLOW: i32 = 0o400_000;
 
 #[repr(C)]
 struct Group {
-    _gr_name: *mut i8,
-    _gr_passwd: *mut i8,
+    _gr_name: *mut c_char,
+    _gr_passwd: *mut c_char,
     gr_gid: u32,
-    _gr_mem: *mut *mut i8,
+    _gr_mem: *mut *mut c_char,
 }
 
 /// `flock` exclusivo sobre el candado de escritura. Al soltar el valor se libera.
