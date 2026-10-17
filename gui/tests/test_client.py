@@ -68,12 +68,30 @@ class TestRutas(unittest.TestCase):
     def test_state_paths_respeta_xdg(self):
         env = EntornoXdg()
         try:
-            nuevo, legado = state_paths()
+            rutas = state_paths()
+            self.assertIsNotNone(rutas)
+            assert rutas is not None
+            nuevo, legado = rutas
             self.assertTrue(nuevo.startswith(env.tmp))
             self.assertTrue(nuevo.endswith("keybackcon/state"))
             self.assertTrue(legado.endswith("kbd-rgb/state"))
         finally:
             env.restaurar()
+
+    def test_state_paths_sin_home_absoluto_no_usa_var_tmp(self):
+        guardados = {k: os.environ.get(k) for k in ("HOME", "XDG_STATE_HOME")}
+        try:
+            os.environ.pop("XDG_STATE_HOME", None)
+            os.environ["HOME"] = "relativo/no-absoluto"
+            self.assertIsNone(state_paths())
+            os.environ.pop("HOME", None)
+            self.assertIsNone(state_paths())
+        finally:
+            for clave, valor in guardados.items():
+                if valor is None:
+                    os.environ.pop(clave, None)
+                else:
+                    os.environ[clave] = valor
 
     def test_pid_paths_respeta_runtime(self):
         env = EntornoXdg()

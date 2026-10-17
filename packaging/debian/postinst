@@ -1,6 +1,13 @@
 #!/bin/sh
 set -e
 
+if command -v systemd-sysusers >/dev/null 2>&1; then
+  systemd-sysusers keybackcon.conf || true
+fi
+if command -v systemd-tmpfiles >/dev/null 2>&1; then
+  systemd-tmpfiles --create keybackcon.conf || true
+fi
+
 if [ -x /usr/bin/udevadm ]; then
   /usr/bin/udevadm control --reload-rules || true
   /usr/bin/udevadm trigger --subsystem-match=hidraw || true

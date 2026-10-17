@@ -10,12 +10,13 @@
 //! (efectos autónomos on/off). El dispositivo declara `IntensityLevelCount=1`
 //! (sin canal de brillo separable), así que `brightness` escala el color base
 //! y lo persiste en `$XDG_STATE_HOME/keybackcon/state`. Una animación en
-//! primer plano es la única escritora de color, coordinada por un pidfile
-//! atómico en `$XDG_RUNTIME_DIR/keybackcon/animation.pid`.
+//! primer plano es una escritora de color. Toda escritura HID comparte el
+//! `flock` de `/run/keybackcon/writer.lock`; el pidfile solo anota la animación.
 //!
 //! # Mapa de módulos
 //!
 //! - `animation`: bucle de animación, pidfile validado y parada por señal.
+//! - `writer`: candado exclusivo de toda escritura HID.
 //! - `cli`: parser y despacho de comandos, ayuda y códigos de salida.
 //! - `color`: `Rgb`, predefinidos, parseo, escala de brillo y HSV.
 //! - `error`: errores de uso, entrada inválida e I/O del CLI.
@@ -33,6 +34,7 @@ mod error;
 mod lamp;
 mod protocol;
 mod state;
+mod writer;
 mod xdg;
 
 fn main() {

@@ -48,9 +48,9 @@
 
 ## Exclusión de escritura
 
-Contrato que cierra la enmienda del ADR 13. El árbol anterior solo tomaba
-el `flock` dentro de la animación; hasta que el código lo cumpla, esta
-sección es el requisito, no una descripción del binario ya publicado.
+Contrato que cierra la enmienda del ADR 13. El binario toma el `flock`
+en cada escritura HID. Las filas de la tabla que citan T-08 en adelante
+siguen siendo requisito hasta el PR que las implementa.
 
 Una sola escritura HID a la vez entre los procesos del producto que toman
 el candado (`/run/keybackcon/writer.lock`). `info` no escribe y no necesita

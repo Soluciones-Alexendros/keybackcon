@@ -46,12 +46,17 @@ def _absolute_or_none(path: str | None) -> str | None:
     return p
 
 
-def state_paths():
+def state_paths() -> tuple[str, str] | None:
+    """Rutas de estado, o None si no hay XDG absoluto.
+
+    Sin ``XDG_STATE_HOME`` absoluto y sin ``HOME`` absoluto no hay ruta
+    compartida: no se usa ``/var/tmp``.
+    """
     base = _absolute_or_none(os.environ.get("XDG_STATE_HOME"))
     if base is None:
-        home = _absolute_or_none(os.environ.get("HOME")) or os.path.expanduser("~")
-        if not os.path.isabs(home):
-            home = "/var/tmp"
+        home = _absolute_or_none(os.environ.get("HOME"))
+        if home is None:
+            return None
         base = os.path.join(home, ".local/state")
     return (
         os.path.join(base, "keybackcon/state"),
@@ -205,7 +210,10 @@ class KeybackconClient:
         self._run(["firmware-effects", "on" if on else "off"])
 
     def get_state_file(self) -> tuple[str, int]:
-        for path in state_paths():
+        paths = state_paths()
+        if paths is None:
+            return "ffffff", 100
+        for path in paths:
             try:
                 with open(path) as f:
                     raw = f.read()

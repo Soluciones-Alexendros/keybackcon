@@ -71,6 +71,46 @@ function installUdev() {
   );
 }
 
+function installWriterLock() {
+  if (process.env.KEYBACKCON_SKIP_UDEV === '1') {
+    log('candado de escritura omitido (KEYBACKCON_SKIP_UDEV=1)');
+    return;
+  }
+  const sys = path.join(ROOT, 'sysusers.d', 'keybackcon.conf');
+  const tmp = path.join(ROOT, 'tmpfiles.d', 'keybackcon.conf');
+  const sysDest = '/usr/lib/sysusers.d/keybackcon.conf';
+  const tmpDest = '/usr/lib/tmpfiles.d/keybackcon.conf';
+  const cmds = process.getuid && process.getuid() === 0
+    ? [
+        ['install', ['-D', '-m644', sys, sysDest]],
+        ['install', ['-D', '-m644', tmp, tmpDest]],
+        ['systemd-sysusers', ['keybackcon.conf']],
+        ['systemd-tmpfiles', ['--create', 'keybackcon.conf']],
+      ]
+    : null;
+  if (cmds) {
+    cmds.forEach(([cmd, args]) => run(cmd, args));
+    log('candado de escritura instalado (root)');
+    return;
+  }
+  const sudo = [
+    ['install', ['-D', '-m644', sys, sysDest]],
+    ['install', ['-D', '-m644', tmp, tmpDest]],
+    ['systemd-sysusers', ['keybackcon.conf']],
+    ['systemd-tmpfiles', ['--create', 'keybackcon.conf']],
+  ];
+  if (sudo.every(([cmd, args]) => run('sudo', ['-n', cmd, ...args]))) {
+    log('candado de escritura instalado (sudo)');
+    return;
+  }
+  warn(
+    'no se pudo crear /run/keybackcon/writer.lock. Sin ese candado el CLI no escribe.\n' +
+      `   sudo install -D -m644 ${sys} ${sysDest}\n` +
+      `   sudo install -D -m644 ${tmp} ${tmpDest}\n` +
+      '   sudo systemd-sysusers keybackcon.conf && sudo systemd-tmpfiles --create keybackcon.conf'
+  );
+}
+
 function installSystemdUnits(bin) {
   if (spawnSync('systemctl', ['--user', 'show-environment'], { stdio: 'ignore' }).status !== 0) {
     warn('systemd de usuario no disponible; se omite la instalación de servicios');
@@ -110,6 +150,7 @@ function main() {
     log(`binario: ${bin}`);
   }
   installUdev();
+  installWriterLock();
   if (bin) installSystemdUnits(bin);
   log('listo. Prueba con: keybackcon info');
 }

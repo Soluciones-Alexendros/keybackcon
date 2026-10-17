@@ -103,7 +103,8 @@ Atajos de la GUI: `Ctrl+1…9` cambia de filtro, `+`/`−` ajusta intensidad.
   demonio privilegiado en medio.
 - Tu color y brillo se guardan y sobreviven a reinicios. Ajustar el brillo
   **no** detiene una animación en curso (la animación relee el porcentaje).
-- Solo hay una animación a la vez: fijar color o pedir `stop` la detiene antes.
+- Solo hay una escritura a la vez (candado `/run/keybackcon/writer.lock`).
+  Fijar color o pedir `stop` detiene la animación antes de volver a escribir.
 
 Detalle técnico (HID LampArray, informes, estado): [`docs/architecture/protocol.md`](docs/architecture/protocol.md),
 diseño en [`ARCHITECTURE.md`](ARCHITECTURE.md) y decisiones en [`docs/architecture/decisions/DECISIONS.md`](docs/architecture/decisions/DECISIONS.md).
