@@ -10,13 +10,14 @@ Próximos objetivos, ordenados por horizonte. Un objetivo solo entra aquí
 cuando está listo para trabajar (criterio claro) o bloqueado (se indica por
 qué). Los hitos ya logrados van al final como histórico.
 
-## En curso — v2.3.0
+## En curso
 
-Rediseño de la ventana (Adwaita) y la bandeja, `info --json`, parada de
-animación sin bloqueos, distribución npm y autoversionado con git-cliff.
-**Pendiente solo el push a `main`**: al llegar, `version.yml` genera el tag
-v2.3.0, `release.yml` publica .deb/tarball/SBOM y `npm.yml` publica el
-paquete npm (requiere el secret `NPM_TOKEN` configurado en el repo).
+Versionado automático de los `feat` que ya están en `main` y todavía no
+tienen tag en esta historia (`5234969`, `dd191bc`). v2.3.0 y v2.3.1 están
+publicadas. El tag `v2.3.1` (`de3a65d`) no es ancestro de `main`; en `main`
+la cadena 2.3.1 entró con `8bbdf37`. El bump lo calcula `version.yml` al
+empujar a `main`. No se fuerza el número ni se mueve el tag. AUR y la
+primera instalación npm siguen en el corto plazo.
 
 ## Corto plazo
 

@@ -80,7 +80,9 @@ jobs:
 
   tag-after-merge:
     # Solo commits de preparación de release ya en main.
-    if: startsWith(github.event.head_commit.message, 'chore(release): prepara v')
+    # Comillas: el mensaje lleva ':' y espacio. Sin ellas el YAML no parsea
+    # y Actions no arranca el workflow.
+    if: "${{ startsWith(github.event.head_commit.message, 'chore(release): prepara v') }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
