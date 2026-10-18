@@ -11,3 +11,5 @@ npm/platforms/*/bin/
 .cursor/
 # .mo compilados por `make i18n` / workflows
 /gui/locale/
+# Planificación local (tasks/plan.md, tasks/todo.md)
+/tasks/
