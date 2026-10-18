@@ -51,7 +51,12 @@ jobs:
             msgfmt -c -o "gui/locale/$lang/LC_MESSAGES/keybackcon.mo" "$po"
           done
       - name: GUI tests
-        run: python3 -m unittest discover -s gui/tests
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-gi gir1.2-glib-2.0 dbus
+          python3 -c "from gi.repository import Gio, GLib; print('Gio', Gio.MAJOR_VERSION)"
+          KEYBACKCON_REQUIRE_DBUS=1 python3 -m unittest discover -s gui/tests
       - name: shellcheck
         run: |
           set -euo pipefail
