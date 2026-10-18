@@ -9,8 +9,10 @@
 Checklist ejecutable (en orden; la fachada es `make validate`):
 
 - [ ] `make lint` — fmt, clippy `--all-targets -D warnings`, rustdoc, `py_compile` de `gui/*.py`
-- [ ] `make test` — `cargo test -- --test-threads=1` (33 tests; los de pid usan `XDG_RUNTIME_DIR` temporal)
-- [ ] `python3 -m unittest discover -s gui/tests` — 47 tests de la GUI (sin display ni hardware)
+- [ ] `make test` — `cargo test -- --test-threads=1` (43 tests; los de pid usan `XDG_RUNTIME_DIR` temporal)
+- [ ] `make i18n` — regenera `po/keybackcon.pot` y compila los `.mo` en `gui/locale/` (los tests de i18n los necesitan)
+- [ ] `python3 -m unittest discover -s gui/tests` — 57 tests de la GUI (sin display ni hardware)
+- [ ] `make check-i18n` — coherencia `.pot`/`.po` y sin cadenas sin traducir
 - [ ] `make smoke` — `./scripts/smoke.sh` (binario + GUI + packaging + tests unitarios)
 - [ ] `./scripts/install.sh` — instala en `~/.local` + udev (sudo) + unidades de usuario
 
@@ -19,8 +21,10 @@ Checklist ejecutable (en orden; la fachada es `make validate`):
 - **Tests de la GUI** (`gui/tests/`, `unittest` de stdlib): `python3 -m
   unittest discover -s gui/tests`. Cubren `client` (con un binario fake en un
   directorio ejecutable — ojo: algunos `/tmp` son `noexec`), `colors`,
-  `theme` (vía archivo, con GSettings aislado), `i18n`, `compat` (detección
-  de distro con `/etc/os-release` emulado) y los helpers de la bandeja. Los
+  `theme` (vía archivo, con GSettings aislado), `i18n` (catálogos `po/*.po`;
+  los que cargan `.mo` hacen skip si no se ejecutó `make i18n`), `compat`
+  (detección de distro con `/etc/os-release` emulado) y los helpers de la
+  bandeja. Los
   tests de bandeja hacen skip si Gtk3/Ayatana faltan o si Gtk4 ya está
   cargado en el proceso (incompatibilidad GTK3/GTK4 documentada); en ese
   caso corren aislados: `python3 -m unittest gui.tests.test_tray_helpers`.
@@ -31,8 +35,10 @@ Checklist ejecutable (en orden; la fachada es `make validate`):
   casts acotados de la animación y despacho del CLI) existen donde un cambio
   de tipos alteraría el comportamiento.
 - **Rustdoc**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` valida los
-  `//!` de módulo y los `///` de los elementos públicos. Los mensajes de cara
-  al usuario están en español a propósito (identidad del proyecto, no i18n).
+  `//!` de módulo y los `///` de los elementos públicos. Los mensajes del
+  **CLI Rust** están en español a propósito (identidad del proyecto); la
+  **GUI** sí es traducible: msgids en inglés con catálogos `po/es.po` y
+  `po/en.po` (ver ADR 14).
 - **Benchmarks**: `cargo run --release --example bench_colors` imprime una
   tabla de ns/op de `parse_color`, `scale`, `hsv`, `to_hex` y los
   constructores de informes, usando solo `std::time::Instant` y
@@ -42,7 +48,7 @@ Checklist ejecutable (en orden; la fachada es `make validate`):
   pseudoaleatorias deterministas con un xorshift64 de semilla fija (sin
   `proptest`, ver ADR 10); corren con el resto de `cargo test`.
 - **Cobertura**: no hay gate `llvm-cov` en este crate (cero dependencias,
-  ADR 2 y 10). El mínimo de flota (≥ 70 %) se cubre con los 33 tests de
+  ADR 2 y 10). El mínimo de flota (≥ 70 %) se cubre con los 43 tests de
   `cargo test` más el smoke. No se añade `criterion`/`proptest`/`tarpaulin`
   para inventar un porcentaje.
 

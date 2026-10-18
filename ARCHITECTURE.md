@@ -123,6 +123,11 @@ fake, colores, tema, i18n, helpers de bandeja) y `gui/compat.py` detecta la
 distribución (`/etc/os-release`) para sugerir el comando de instalación de
 las dependencias en cada familia de paquetes (apt/pacman/dnf/zypper).
 
+La i18n de la GUI es gettext con **msgids en inglés** (`po/keybackcon.pot`)
+y catálogos `po/es.po` y `po/en.po`; `gui/i18n.py` resuelve el idioma y
+compila a `gui/locale/<idioma>/LC_MESSAGES/` con `make i18n` (no se
+versionan los `.mo`). El CLI Rust no se traduce (ADR 14).
+
 ## Flujos
 
 | Flujo | Pasos |
