@@ -570,11 +570,14 @@ class MesaWindow(Adw.ApplicationWindow):
         if info:
             hid = str(info.get("device") or "?")
             lamps = info.get("lamps", "?")
-            self.status_text.set_text(f"{base} · {hid} · {lamps} {_('zone(s)')}")
+            zonas = _("zone(s)")
+            self.status_text.set_text(f"{base} · {hid} · {lamps} {zonas}")
         elif info is None:
-            self.status_text.set_text(f"{base} · {_('looking at the keyboard…')}")
+            mirando = _("looking at the keyboard…")
+            self.status_text.set_text(f"{base} · {mirando}")
         else:
-            self.status_text.set_text(f"{base} · {_('no keyboard in sight')}")
+            sin_teclado = _("no keyboard in sight")
+            self.status_text.set_text(f"{base} · {sin_teclado}")
         return False
 
     # --- selección visual -------------------------------------------------
