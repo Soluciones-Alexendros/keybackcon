@@ -71,6 +71,15 @@ jobs:
           fi
           git commit -m "chore(release): prepara v$NEW"
           BRANCH="chore/release-v$NEW"
+          # Idempotencia: un segundo push a main mientras el PR de release
+          # sigue abierto reempujaba la rama y moría con non-fast-forward.
+          # Si el PR ya existe, solo se refresca su rama (por si main avanzó)
+          # y se deja que el auto-merge + tag-after-merge completen.
+          if EXISTING="$(gh pr list --base main --head "$BRANCH" --state open --json number -q '.[0].number' 2>/dev/null)"; then
+            echo "PR de release #$EXISTING ya existe para v$NEW; refrescando rama."
+            gh pr update-branch "$EXISTING" --rebase 2>/dev/null || true
+            exit 0
+          fi
           git push origin "HEAD:$BRANCH"
           PR_URL="$(gh pr create --base main --head "$BRANCH" \
             --title "chore(release): v$NEW" \
