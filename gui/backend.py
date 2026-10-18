@@ -17,7 +17,14 @@ except ImportError:  # tests sin GI
 
 try:
     from gui import log_exc
+    from gui.i18n import _
 except ImportError:
+    try:
+        from i18n import _
+    except ImportError:
+        def _(s):
+            return s
+
     def log_exc(contexto):
         import sys
         tipo, exc, _tb = sys.exc_info()
@@ -107,7 +114,7 @@ class BackendQueue:
                 c.animation(p)
                 if hasattr(c, "_proc") and c._proc is not None:
                     if c._proc.poll() is not None:
-                        return False, "la animación terminó al arrancar"
+                        return False, _("The animation ended as it started")
             elif k == "off":
                 c.off()
             elif k == "restore":
@@ -115,7 +122,7 @@ class BackendQueue:
             elif k == "firmware":
                 c.firmware_effects(bool(p))
             else:
-                return False, f"intento desconocido: {k}"
+                return False, _("unknown intent: {kind}").format(kind=k)
             return True, None
         except Exception as e:
             log_exc(f"backend {intent.kind}")

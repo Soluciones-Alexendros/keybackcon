@@ -1,15 +1,30 @@
+try:
+    from gui.i18n import N_
+except ImportError:
+    try:
+        from .i18n import N_
+    except ImportError:
+        try:
+            from i18n import N_
+        except ImportError:
+            def N_(s):
+                return s
+
+
+# Los nombres se traducen en el punto de uso (`_(nombre)`); `N_` solo los
+# marca como extraíbles para xgettext.
 COLORES = [
-    ("Blanco", "ffffff"),
-    ("Tungsteno", "ffb86b"),
-    ("Naranja", "ff7800"),
-    ("Rojo", "ff0000"),
-    ("Rosa", "ff50a0"),
-    ("Púrpura", "a000ff"),
-    ("Ultravioleta", "7c6cff"),
-    ("Azul", "0000ff"),
-    ("Cian", "00ffff"),
-    ("Verde", "00ff00"),
-    ("Apagado", "000000"),
+    (N_("White"), "ffffff"),
+    (N_("Tungsten"), "ffb86b"),
+    (N_("Orange"), "ff7800"),
+    (N_("Red"), "ff0000"),
+    (N_("Pink"), "ff50a0"),
+    (N_("Purple"), "a000ff"),
+    (N_("Ultraviolet"), "7c6cff"),
+    (N_("Blue"), "0000ff"),
+    (N_("Cyan"), "00ffff"),
+    (N_("Green"), "00ff00"),
+    (N_("Off"), "000000"),
 ]
 
 

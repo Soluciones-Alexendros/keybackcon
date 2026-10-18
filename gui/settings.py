@@ -186,20 +186,20 @@ if Adw is not None:
             super().__init__()
             self._on_effects_changed = on_effects_changed
             self._client = client
-            self.set_title(_("Preferencias"))
+            self.set_title(_("Preferences"))
             self.add(self._appearance_page())
             self.add(self._behavior_page())
             self.add(self._about_page())
 
         def _appearance_page(self):
             page = Adw.PreferencesPage()
-            page.set_title(_("Apariencia"))
+            page.set_title(_("Appearance"))
             page.set_icon_name("preferences-desktop-theme-symbolic")
             group = Adw.PreferencesGroup()
             page.add(group)
             theme_row = Adw.ComboRow()
-            theme_row.set_title(_("Tema"))
-            theme_row.set_model(Gtk.StringList.new([_("Sistema"), _("Claro"), _("Oscuro")]))
+            theme_row.set_title(_("Theme"))
+            theme_row.set_model(Gtk.StringList.new([_("System"), _("Light"), _("Dark")]))
             modes = ("system", "light", "dark")
             try:
                 current = get_theme()
@@ -212,8 +212,8 @@ if Adw is not None:
             theme_row.connect("notify::selected", self._on_theme_changed)
             group.add(theme_row)
             effects_row = Adw.SwitchRow()
-            effects_row.set_title(_("Efectos del escenario"))
-            effects_row.set_subtitle(_("Partículas y animación en la vista previa."))
+            effects_row.set_title(_("Stage effects"))
+            effects_row.set_subtitle(_("Particles and animation in the preview."))
             try:
                 effects_row.set_active(is_effects_enabled())
             except Exception:
@@ -225,13 +225,13 @@ if Adw is not None:
 
         def _behavior_page(self):
             page = Adw.PreferencesPage()
-            page.set_title(_("Comportamiento"))
+            page.set_title(_("Behavior"))
             page.set_icon_name("preferences-system-symbolic")
             group = Adw.PreferencesGroup()
             page.add(group)
             autostart_row = Adw.SwitchRow()
-            autostart_row.set_title(_("Arranque automático"))
-            autostart_row.set_subtitle(_("Abrir en la bandeja al iniciar la sesión."))
+            autostart_row.set_title(_("Launch at login"))
+            autostart_row.set_subtitle(_("Open in the tray when the session starts."))
             try:
                 autostart_row.set_active(is_autostart_enabled())
             except Exception:
@@ -240,8 +240,8 @@ if Adw is not None:
             autostart_row.connect("notify::active", self._on_autostart_toggled)
             group.add(autostart_row)
             restore_row = Adw.SwitchRow()
-            restore_row.set_title(_("Restaurar color al iniciar"))
-            restore_row.set_subtitle(_("Aplicar el último color al abrir."))
+            restore_row.set_title(_("Restore color at startup"))
+            restore_row.set_subtitle(_("Apply the last color when opening."))
             try:
                 restore_row.set_active(is_restore_enabled())
             except Exception:
@@ -250,8 +250,8 @@ if Adw is not None:
             restore_row.connect("notify::active", self._on_restore_toggled)
             group.add(restore_row)
             restore_now = Adw.ActionRow()
-            restore_now.set_title(_("Restaurar color ahora"))
-            restore_now.set_subtitle(_("Aplica el último color guardado."))
+            restore_now.set_title(_("Restore color now"))
+            restore_now.set_subtitle(_("Applies the last saved color."))
             restore_now.set_activatable(True)
             restore_now.connect("activated", self._on_restore_now)
             group.add(restore_now)
@@ -259,27 +259,27 @@ if Adw is not None:
 
         def _about_page(self):
             page = Adw.PreferencesPage()
-            page.set_title(_("Acerca de"))
+            page.set_title(_("About"))
             page.set_icon_name("help-about-symbolic")
             group = Adw.PreferencesGroup()
             group.set_title("keybackcon")
             page.add(group)
             version_row = Adw.ActionRow()
-            version_row.set_title(_("Versión"))
+            version_row.set_title(_("Version"))
             version_row.add_suffix(Gtk.Label(label=APP_VERSION))
             group.add(version_row)
             license_row = Adw.ActionRow()
-            license_row.set_title(_("Licencia"))
+            license_row.set_title(_("License"))
             license_row.add_suffix(Gtk.Label(label="MIT"))
             group.add(license_row)
             link_row = Adw.ActionRow()
-            link_row.set_title(_("Código fuente"))
+            link_row.set_title(_("Source code"))
             link_row.set_subtitle(REPO_URL)
             link_row.set_activatable(True)
             link_row.connect("activated", self._on_repo_activated)
             group.add(link_row)
             device_row = Adw.ActionRow()
-            device_row.set_title(_("Dispositivo"))
+            device_row.set_title(_("Device"))
             device_row.set_subtitle(self._device_line())
             group.add(device_row)
             if self._client is not None:
@@ -347,11 +347,11 @@ if Adw is not None:
 
         def _device_line(self):
             if self._client is None:
-                return _("sin teclado a la vista")
-            return _("mirando el teclado…")
+                return _("no keyboard in sight")
+            return _("looking at the keyboard…")
 
         def _fetch_device_line(self, row):
-            texto = _("sin teclado a la vista")
+            texto = _("no keyboard in sight")
             try:
                 info = self._client.info()
             except Exception:
@@ -361,7 +361,7 @@ if Adw is not None:
                 hid = str(info.get("device") or "?")
                 lamps = info.get("lamps", "?")
                 try:
-                    texto = f"{hid} · {lamps} {_('zona(s)')}"
+                    texto = f"{hid} · {lamps} {_('zone(s)')}"
                 except Exception:
                     log_exc("ficha de dispositivo")
             if GLib is not None:

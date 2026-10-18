@@ -135,7 +135,7 @@ class TestRunErrores(unittest.TestCase):
         cliente = KeybackconClient(binary="/no/existe/keybackcon")
         with self.assertRaises(KeybackconError) as ctx:
             cliente.info()
-        self.assertIn("No encuentro el binario", ctx.exception.message)
+        self.assertIn("Cannot find the binary", ctx.exception.message)
 
     def test_error_con_stderr(self):
         fake = BinarioFake("#!/bin/sh\necho 'teclado furioso' >&2\nexit 1\n")
@@ -150,7 +150,7 @@ class TestRunErrores(unittest.TestCase):
         cliente = KeybackconClient(binary=fake.ruta)
         with self.assertRaises(KeybackconError) as ctx:
             cliente.off()
-        self.assertIn("código 3", ctx.exception.message)
+        self.assertIn("code 3", ctx.exception.message)
         fake.limpiar()
 
     def test_timeout(self):
@@ -162,7 +162,7 @@ class TestRunErrores(unittest.TestCase):
         with mock.patch("gui.client.subprocess.run", side_effect=timeout_run):
             with self.assertRaises(KeybackconError) as ctx:
                 cliente.restore()
-        self.assertIn("tardó demasiado", ctx.exception.message)
+        self.assertIn("took too long to respond", ctx.exception.message)
 
 
 class TestInfoJson(unittest.TestCase):
