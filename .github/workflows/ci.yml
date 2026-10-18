@@ -39,6 +39,17 @@ jobs:
           test "$VER_TOML" = "$VER_LOCK"
       - name: GUI py_compile
         run: python3 -m py_compile gui/*.py
+      - name: Catálogos i18n
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gettext
+          python3 scripts/check-i18n.py --extract
+          for po in po/*.po; do
+            lang=$(basename "$po" .po)
+            mkdir -p "gui/locale/$lang/LC_MESSAGES"
+            msgfmt -c -o "gui/locale/$lang/LC_MESSAGES/keybackcon.mo" "$po"
+          done
       - name: GUI tests
         run: python3 -m unittest discover -s gui/tests
       - name: shellcheck
@@ -53,11 +64,6 @@ jobs:
           set -euo pipefail
           sudo apt-get install -y -qq desktop-file-utils
           desktop-file-validate packaging/desktop/keybackcon.desktop
-      - name: gettext
-        run: |
-          set -euo pipefail
-          sudo apt-get install -y -qq gettext
-          msgfmt -c -o /tmp/keybackcon-test.mo po/es.po
 
   test:
     name: test

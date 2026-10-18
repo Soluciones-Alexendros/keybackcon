@@ -11,5 +11,6 @@ usr/lib/sysusers.d/keybackcon.conf
 usr/lib/systemd/user/keybackcon.service
 usr/lib/systemd/user/keybackcon-animation@.service
 usr/share/locale/es/LC_MESSAGES/keybackcon.mo
+usr/share/locale/en/LC_MESSAGES/keybackcon.mo
 usr/share/glib-2.0/schemas/org.iniciativas.keybackcon.gschema.xml
 usr/share/licenses/keybackcon/LICENSE

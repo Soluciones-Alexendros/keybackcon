@@ -51,5 +51,6 @@ assets = [
     ["packaging/sysusers.d/keybackcon.conf", "usr/lib/sysusers.d/keybackcon.conf", "644"],
     ["packaging/systemd/*.service", "usr/lib/systemd/user/", "644"],
     ["gui/locale/es/LC_MESSAGES/keybackcon.mo", "usr/share/locale/es/LC_MESSAGES/keybackcon.mo", "644"],
+    ["gui/locale/en/LC_MESSAGES/keybackcon.mo", "usr/share/locale/en/LC_MESSAGES/keybackcon.mo", "644"],
     ["gui/org.iniciativas.keybackcon.gschema.xml", "usr/share/glib-2.0/schemas/org.iniciativas.keybackcon.gschema.xml", "644"],
 ]

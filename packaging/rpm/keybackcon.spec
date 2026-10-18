@@ -20,8 +20,11 @@ La GUI requiere GTK 4 y libadwaita >= 1.5.
 
 %build
 cargo build --release --locked
-mkdir -p gui/locale/es/LC_MESSAGES
-msgfmt -o gui/locale/es/LC_MESSAGES/keybackcon.mo po/es.po
+for po in po/*.po; do
+  lang="${po##*/}"; lang="${lang%.po}"
+  mkdir -p "gui/locale/${lang}/LC_MESSAGES"
+  msgfmt -o "gui/locale/${lang}/LC_MESSAGES/keybackcon.mo" "${po}"
+done
 
 %install
 install -D -m755 target/release/keybackcon %{buildroot}%{_bindir}/keybackcon
@@ -35,7 +38,10 @@ install -D -m644 packaging/tmpfiles.d/keybackcon.conf %{buildroot}%{_prefix}/lib
 install -D -m644 packaging/sysusers.d/keybackcon.conf %{buildroot}%{_prefix}/lib/sysusers.d/keybackcon.conf
 install -D -m644 packaging/systemd/keybackcon.service %{buildroot}%{_userunitdir}/keybackcon.service
 install -D -m644 packaging/systemd/keybackcon-animation@.service %{buildroot}%{_userunitdir}/keybackcon-animation@.service
-install -D -m644 gui/locale/es/LC_MESSAGES/keybackcon.mo %{buildroot}%{_datadir}/locale/es/LC_MESSAGES/keybackcon.mo
+for mo in gui/locale/*/LC_MESSAGES/keybackcon.mo; do
+  lang="${mo#gui/locale/}"; lang="${lang%%/*}"
+  install -D -m644 "${mo}" %{buildroot}%{_datadir}/locale/${lang}/LC_MESSAGES/keybackcon.mo
+done
 install -D -m644 gui/org.iniciativas.keybackcon.gschema.xml %{buildroot}%{_datadir}/glib-2.0/schemas/org.iniciativas.keybackcon.gschema.xml
 install -D -m644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
 
@@ -51,6 +57,7 @@ install -D -m644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
 %{_userunitdir}/keybackcon.service
 %{_userunitdir}/keybackcon-animation@.service
 %{_datadir}/locale/es/LC_MESSAGES/keybackcon.mo
+%{_datadir}/locale/en/LC_MESSAGES/keybackcon.mo
 %{_datadir}/glib-2.0/schemas/org.iniciativas.keybackcon.gschema.xml
 %license LICENSE
 

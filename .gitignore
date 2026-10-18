@@ -9,3 +9,5 @@ npm/platforms/*/bin/
 *~
 .DS_Store
 .cursor/
+# .mo compilados por `make i18n` / workflows
+/gui/locale/

@@ -151,17 +151,23 @@ else
   bad "schema"
 fi
 
-pot_n=$(grep -c '^msgid' "${REPO_DIR}/po/keybackcon.pot")
-po_n=$(grep -c '^msgid' "${REPO_DIR}/po/es.po")
-if [ "$pot_n" = "$po_n" ]; then
-  ok "i18n cobertura .pot/.po (${pot_n} msgid)"
+if python3 "${REPO_DIR}/scripts/check-i18n.py"; then
+  ok "i18n catálogos coherentes (.pot/.po)"
 else
-  bad "i18n cobertura .pot (${pot_n}) vs .po (${po_n})"
+  bad "i18n catálogos (.pot/.po)"
 fi
-if [ -z "$(grep '^msgid' "${REPO_DIR}/po/keybackcon.pot" | sort | uniq -d)" ] && [ -z "$(grep '^msgid' "${REPO_DIR}/po/es.po" | sort | uniq -d)" ]; then
-  ok "i18n sin msgid duplicados"
+if command -v msgfmt >/dev/null 2>&1; then
+  i18n_fail=0
+  for po in "${REPO_DIR}"/po/*.po; do
+    msgfmt -c -o /dev/null "$po" || i18n_fail=1
+  done
+  if [ "$i18n_fail" -eq 0 ]; then
+    ok "i18n msgfmt -c (todos los .po)"
+  else
+    bad "i18n msgfmt -c"
+  fi
 else
-  bad "i18n msgid duplicados"
+  ok "msgfmt no disponible, catálogos sin compilar (omitido)"
 fi
 
 if python3 "${REPO_DIR}/gui/main.py" --help >/dev/null 2>&1; then

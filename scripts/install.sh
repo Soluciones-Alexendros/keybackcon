@@ -61,24 +61,24 @@ install -m644 "${REPO_DIR}"/gui/*.py "${GUI_DST}/"
 install -m644 "${REPO_DIR}/packaging/udev/70-keybackcon.rules" "${HOME}/.local/share/keybackcon/70-keybackcon.rules"
 install -m755 "${REPO_DIR}/packaging/keybackcon-gui" "${BIN_DST}/keybackcon-gui"
 
-echo "==> keybackcon: compilar traducciones (es)"
-MO_SRC="${REPO_DIR}/po/es.po"
-MO_BUILD="${REPO_DIR}/gui/locale/es/LC_MESSAGES/keybackcon.mo"
-MO_DST="${HOME}/.local/share/locale/es/LC_MESSAGES/keybackcon.mo"
+echo "==> keybackcon: compilar traducciones (es, en)"
+MO_SRC_DIR="${REPO_DIR}/po"
 if command -v msgfmt >/dev/null 2>&1; then
-  mkdir -p "$(dirname "${MO_BUILD}")"
-  msgfmt -o "${MO_BUILD}" "${MO_SRC}"
-  echo "    .mo generado en ${MO_BUILD}"
+  for MO_SRC in "${MO_SRC_DIR}"/*.po; do
+    [ -f "${MO_SRC}" ] || continue
+    LANG_CODE="$(basename "${MO_SRC}" .po)"
+    MO_BUILD="${REPO_DIR}/gui/locale/${LANG_CODE}/LC_MESSAGES/keybackcon.mo"
+    MO_DST="${HOME}/.local/share/locale/${LANG_CODE}/LC_MESSAGES/keybackcon.mo"
+    mkdir -p "$(dirname "${MO_BUILD}")"
+    msgfmt -o "${MO_BUILD}" "${MO_SRC}"
+    echo "    .mo generado en ${MO_BUILD}"
+    mkdir -p "$(dirname "${MO_DST}")"
+    install -m644 "${MO_BUILD}" "${MO_DST}"
+    echo "    locale instalado en ${MO_DST}"
+  done
 else
-  echo "    aviso: msgfmt no disponible, se omite la compilación del .mo (la GUI usará el idioma por defecto)" >&2
+  echo "    aviso: msgfmt no disponible, se omite la compilación de los .mo (la GUI usará el idioma por defecto)" >&2
   echo "    pista: $(pkg_hint gettext)" >&2
-fi
-if [ -f "${MO_BUILD}" ]; then
-  mkdir -p "$(dirname "${MO_DST}")"
-  install -m644 "${MO_BUILD}" "${MO_DST}"
-  echo "    locale instalado en ${MO_DST}"
-else
-  echo "    aviso: sin .mo compilado, se omite la instalación del locale" >&2
 fi
 
 echo "==> keybackcon: instalar schema GSettings"
