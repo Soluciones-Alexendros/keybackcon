@@ -192,14 +192,14 @@ class MesaWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         # Píldora de estado compacta en la barra (sustituye a la sección de pie).
         self.status_dot = Gtk.Label(label="●")
-        self.status_text = Gtk.Label(label=_("mirando el teclado…"))
+        self.status_text = Gtk.Label(label=_("looking at the keyboard…"))
         self.status_text.add_css_class("mono-font")
         pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         pill.append(self.status_dot)
         pill.append(self.status_text)
         header.pack_start(pill)
         prefs_button = Gtk.Button.new_from_icon_name("preferences-system-symbolic")
-        prefs_button.set_tooltip_text(_("Preferencias"))
+        prefs_button.set_tooltip_text(_("Preferences"))
         prefs_button.connect("clicked", self._on_preferences_clicked)
         header.pack_end(prefs_button)
         toolbar.add_top_bar(header)
@@ -242,29 +242,29 @@ class MesaWindow(Adw.ApplicationWindow):
         content.append(page)
 
         g_mov = Adw.PreferencesGroup(
-            title=_("Cómo se mueve"),
-            description=_("Fija la luz o déjala respirar."),
+            title=_("How it moves"),
+            description=_("Hold the light steady or let it breathe."),
         )
         seg = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         seg.add_css_class("linked")
         seg.set_homogeneous(True)
         self.seg_buttons = {}
-        for key, label in (("fijar", _("Fijar")), ("breathe", _("Respirar")), ("rainbow", _("Arcoíris"))):
+        for key, label in (("fijar", _("Steady")), ("breathe", _("Breathe")), ("rainbow", _("Rainbow"))):
             b = Gtk.ToggleButton(label=label)
             b.set_hexpand(True)
             seg.append(b)
             self.seg_buttons[key] = b
         g_mov.add(seg)
         stop_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        self.stop_btn = Gtk.Button(label=_("Parar movimiento"))
+        self.stop_btn = Gtk.Button(label=_("Stop motion"))
         self.stop_btn.connect("clicked", self._on_stop)
         stop_box.append(self.stop_btn)
         g_mov.add(stop_box)
         page.add(g_mov)
 
         g_bright = Adw.PreferencesGroup(
-            title=_("Cuánta luz quieres"),
-            description=_("Desliza o usa − / + . Se guarda solo."),
+            title=_("How much light you want"),
+            description=_("Slide or use − / + . It saves itself."),
         )
         brow = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         minus = Gtk.Button(label="−")
@@ -280,15 +280,15 @@ class MesaWindow(Adw.ApplicationWindow):
         try:
             self.bright_scale.update_property(
                 (Gtk.AccessibleProperty.LABEL, Gtk.AccessibleProperty.VALUE_TEXT),
-                (_("Brillo"), f"{self.cur_pct} %"),
+                (_("Brightness"), f"{self.cur_pct} %"),
             )
         except Exception:
             log_exc("accesible del brillo")
         self.bright_scale.connect("value-changed", self._on_bright_scale)
         brow.append(self.bright_scale)
-        minus.set_tooltip_text(_("Bajar brillo"))
+        minus.set_tooltip_text(_("Lower brightness"))
         plus = Gtk.Button(label="+")
-        plus.set_tooltip_text(_("Subir brillo"))
+        plus.set_tooltip_text(_("Raise brightness"))
         plus.connect("clicked", self._on_bright_step, 1)
         brow.append(plus)
         self.bright_value = Gtk.Label(label=f"{self.cur_pct}%")
@@ -299,8 +299,8 @@ class MesaWindow(Adw.ApplicationWindow):
         page.add(g_bright)
 
         g_color = Adw.PreferencesGroup(
-            title=_("Elige tu luz"),
-            description=_("Toca un filtro o crea tu propio tono."),
+            title=_("Choose your light"),
+            description=_("Tap a filter or create your own shade."),
         )
         flow = Gtk.FlowBox()
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -333,7 +333,7 @@ class MesaWindow(Adw.ApplicationWindow):
         flow.set_min_children_per_line(6)
         flow_row.set_child(flow)
         g_color.add(flow_row)
-        custom_row = Adw.ActionRow(title=_("Tono personalizado"))
+        custom_row = Adw.ActionRow(title=_("Custom shade"))
         try:
             dlg = Gtk.ColorDialog()
             self.custom_btn = Gtk.ColorDialogButton(dialog=dlg)
@@ -384,8 +384,8 @@ class MesaWindow(Adw.ApplicationWindow):
         self.toast_overlay.add_toast(Adw.Toast.new(msg))
 
     def _error(self, msg):
-        dlg = Adw.AlertDialog.new(_("Algo no salió"), msg)
-        dlg.add_response("ok", _("Entendido"))
+        dlg = Adw.AlertDialog.new(_("Something went wrong"), msg)
+        dlg.add_response("ok", _("Got it"))
         dlg.set_default_response("ok")
         dlg.set_close_response("ok")
         dlg.present(self)
@@ -431,7 +431,7 @@ class MesaWindow(Adw.ApplicationWindow):
                 self.cur_color = prev
                 self._mark_selected()
                 self._refresh_caption()
-                self._error(err or _("No se pudo fijar el color"))
+                self._error(err or _("Could not set the color"))
                 return
             if ok_msg:
                 self._toast(ok_msg)
@@ -441,14 +441,14 @@ class MesaWindow(Adw.ApplicationWindow):
     def _run_brightness(self, value):
         def done(ok, err):
             if not ok:
-                self._error(err or _("No se pudo ajustar el brillo"))
+                self._error(err or _("Could not adjust the brightness"))
 
         return self._backend_submit("brightness", value, done)
 
     def _run_stop(self, ok_msg=None):
         def done(ok, err):
             if not ok:
-                self._error(err or _("No se pudo parar"))
+                self._error(err or _("Could not stop"))
                 return
             if ok_msg:
                 self._toast(ok_msg)
@@ -459,9 +459,9 @@ class MesaWindow(Adw.ApplicationWindow):
         def done(ok, err):
             if not ok:
                 self.preview_mode = "fijar"
-                self._error(err or _("No se pudo arrancar la animación"))
+                self._error(err or _("Could not start the animation"))
                 return
-            self._toast(_("Movimiento {mode} en marcha").format(mode=mode_label(mode)))
+            self._toast(_("{mode} motion running").format(mode=mode_label(mode)))
 
         return self._backend_submit("animation", mode, done)
 
@@ -560,21 +560,21 @@ class MesaWindow(Adw.ApplicationWindow):
             self.status_dot.set_text("●")
             self.status_dot.remove_css_class("status-dot-idle")
             self.status_dot.add_css_class("status-dot-alive")
-            base = _("moviéndose (pid {pid})").format(pid=pid)
+            base = _("moving (pid {pid})").format(pid=pid)
         else:
             self.status_dot.set_text("○")
             self.status_dot.remove_css_class("status-dot-alive")
             self.status_dot.add_css_class("status-dot-idle")
-            base = _("luz fija")
+            base = _("steady light")
         info = self._device_info
         if info:
             hid = str(info.get("device") or "?")
             lamps = info.get("lamps", "?")
-            self.status_text.set_text(f"{base} · {hid} · {lamps} {_('zona(s)')}")
+            self.status_text.set_text(f"{base} · {hid} · {lamps} {_('zone(s)')}")
         elif info is None:
-            self.status_text.set_text(f"{base} · {_('mirando el teclado…')}")
+            self.status_text.set_text(f"{base} · {_('looking at the keyboard…')}")
         else:
-            self.status_text.set_text(f"{base} · {_('sin teclado a la vista')}")
+            self.status_text.set_text(f"{base} · {_('no keyboard in sight')}")
         return False
 
     # --- selección visual -------------------------------------------------
@@ -587,7 +587,7 @@ class MesaWindow(Adw.ApplicationWindow):
                 btn.remove_css_class("selected")
 
     def _refresh_caption(self):
-        name = next((n for n, h in COLORES if h == self.cur_color), "Tu tono")
+        name = next((n for n, h in COLORES if h == self.cur_color), _("Your shade"))
         self.stage_caption.set_text(f"{_(name)} · #{self.cur_color} · {self.cur_pct}%")
         self.bright_value.set_text(f"{self.cur_pct}%")
         try:
@@ -609,7 +609,7 @@ class MesaWindow(Adw.ApplicationWindow):
         except Exception:
             log_exc("parar animación")
         try:
-            if self._run_set(hexv, _("{nombre} aplicado").format(nombre=_(nombre))):
+            if self._run_set(hexv, _("{nombre} applied").format(nombre=_(nombre))):
                 self._mark_selected()
                 self._refresh_caption()
         finally:
@@ -626,7 +626,7 @@ class MesaWindow(Adw.ApplicationWindow):
         except Exception:
             log_exc("parar animación")
         try:
-            if self._run_set(hexv, _("Tu tono #{hexv} aplicado").format(hexv=hexv)):
+            if self._run_set(hexv, _("Your shade #{hexv} applied").format(hexv=hexv)):
                 self._mark_selected()
                 self._refresh_caption()
         finally:
@@ -692,7 +692,7 @@ class MesaWindow(Adw.ApplicationWindow):
         for b in self.seg_buttons.values():
             b.set_active(False)
         self.seg_buttons["fijar"].set_active(True)
-        if self._run_stop(_("Luz fijada de nuevo")):
+        if self._run_stop(_("Light steady again")):
             self._run_set(self.cur_color)
 
     def open_preferences(self):
@@ -790,19 +790,19 @@ class MesaWindow(Adw.ApplicationWindow):
             log_exc("comprobar pkexec")
             can = False
         if can:
-            body = _("No se pudo hablar con el teclado. Suele ser un permiso del sistema y se arregla con un clic.")
+            body = _("Could not talk to the keyboard. It is usually a system permission and one click fixes it.")
         else:
-            body = _("No se pudo hablar con el teclado. Instálalo a mano y reintenta: install -m644 ~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=hidraw")
+            body = _("Could not talk to the keyboard. Install it by hand and retry: install -m644 ~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=hidraw")
         try:
-            dlg = Adw.AlertDialog.new(_("Sin acceso al teclado"), body)
+            dlg = Adw.AlertDialog.new(_("No keyboard access"), body)
         except Exception:
             log_exc("diálogo udev")
             return False
         try:
             if can:
-                dlg.add_response("install", _("Instalar permiso"))
-            dlg.add_response("retry", _("Reintentar"))
-            dlg.add_response("ok", _("Entendido"))
+                dlg.add_response("install", _("Install permission"))
+            dlg.add_response("retry", _("Retry"))
+            dlg.add_response("ok", _("Got it"))
             dlg.set_default_response("ok")
             dlg.set_close_response("ok")
         except Exception:
@@ -837,7 +837,7 @@ class MesaWindow(Adw.ApplicationWindow):
             if proc.returncode != 0:
                 error = (proc.stderr or proc.stdout or "").strip()
                 if not error:
-                    error = _("Permiso no instalado (pkexec cancelado o sin autorización).")
+                    error = _("Permission not installed (pkexec cancelled or not authorized).")
         except Exception as e:
             log_exc("instalar permiso")
             error = str(e)

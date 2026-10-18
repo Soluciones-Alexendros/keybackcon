@@ -3,249 +3,355 @@
 # This file is distributed under the same license as the keybackcon package.
 msgid ""
 msgstr ""
-"Project-Id-Version: keybackcon 2.1.0\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-14 00:00+0000\n"
-"PO-Revision-Date: 2026-09-14 00:00+0000\n"
+"Project-Id-Version: keybackcon 2.4.1\n"
+"Report-Msgid-Bugs-To: https://github.com/Soluciones-Alexendros/keybackcon/"
+"issues\n"
+"POT-Creation-Date: 2026-10-18 22:04+0200\n"
+"PO-Revision-Date: 2026-10-18 00:00+0000\n"
 "Last-Translator: keybackcon <keybackcon@local>\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: gui/control_panel.py:14
-msgid "Keyboard Backlight Controls"
-msgstr "Keyboard Backlight Controls"
+#: gui/backend.py:117
+msgid "The animation ended as it started"
+msgstr "la animación terminó al arrancar"
 
-#: gui/control_panel.py:310
-msgid "Elige tu luz"
-msgstr "Elige tu luz"
-
-#: gui/control_panel.py:310
-msgid "Toca un filtro o crea tu propio tono."
-msgstr "Toca un filtro o crea tu propio tono."
-
-#: gui/control_panel.py:52
-msgid "Blanco"
-msgstr "Blanco"
-
-#: gui/control_panel.py:53
-msgid "Tungsteno"
-msgstr "Tungsteno"
-
-#: gui/control_panel.py:54
-msgid "Naranja"
-msgstr "Naranja"
-
-#: gui/control_panel.py:55
-msgid "Rojo"
-msgstr "Rojo"
-
-#: gui/control_panel.py:56
-msgid "Rosa"
-msgstr "Rosa"
-
-#: gui/control_panel.py:57
-msgid "Púrpura"
-msgstr "Púrpura"
-
-#: gui/control_panel.py:58
-msgid "Ultravioleta"
-msgstr "Ultravioleta"
-
-#: gui/control_panel.py:59
-msgid "Azul"
-msgstr "Azul"
-
-#: gui/control_panel.py:60
-msgid "Cian"
-msgstr "Cian"
-
-#: gui/control_panel.py:61
-msgid "Verde"
-msgstr "Verde"
-
-#: gui/control_panel.py:62
-msgid "Apagado"
-msgstr "Apagado"
-
-#: gui/control_panel.py:469
-msgid "Tu tono"
-msgstr "Tu tono"
-
-#: gui/control_panel.py:352
-msgid "Cuánta luz quieres"
-msgstr "Cuánta luz quieres"
-
-#: gui/control_panel.py:352
-msgid "Desliza o usa − / + . Se guarda solo."
-msgstr "Desliza o usa − / + . Se guarda solo."
-
-#: gui/control_panel.py:377
-msgid "Cómo se mueve"
-msgstr "Cómo se mueve"
-
-#: gui/control_panel.py:377
-msgid "Fija la luz o déjala respirar."
-msgstr "Fija la luz o déjala respirar."
-
-#: gui/control_panel.py:383
-msgid "Fijar"
-msgstr "Fijar"
-
-#: gui/control_panel.py:384
-msgid "Respirar"
-msgstr "Respirar"
-
-#: gui/control_panel.py:385
-msgid "Arcoíris"
-msgstr "Arcoíris"
-
-#: gui/control_panel.py:395
-msgid "Parar movimiento"
-msgstr "Parar movimiento"
-
-#: gui/control_panel.py:402
-msgid "mirando el teclado…"
-msgstr "mirando el teclado…"
-
-#: gui/control_panel.py:533
-msgid "luz fija"
-msgstr "luz fija"
-
-#: gui/control_panel.py:528
+#: gui/backend.py:125
 #, python-brace-format
-msgid "moviéndose (pid {pid})"
-msgstr "moviéndose (pid {pid})"
+msgid "unknown intent: {kind}"
+msgstr "intento desconocido: {kind}"
 
-#: gui/control_panel.py:539
-msgid "sin teclado a la vista"
-msgstr "sin teclado a la vista"
-
-#: gui/control_panel.py:537
-msgid "zona(s)"
-msgstr "zona(s)"
-
-#: gui/control_panel.py:453
-msgid "Algo no salió"
-msgstr "Algo no salió"
-
-#: gui/control_panel.py:454
-msgid "Entendido"
-msgstr "Entendido"
-
-#: gui/control_panel.py:445
+#: gui/client.py:108 gui/client.py:202
 #, python-brace-format
-msgid "No encuentro el binario ({BIN}). Instálalo primero."
-msgstr "No encuentro el binario ({BIN}). Instálalo primero."
+msgid "Cannot find the binary ({bin}). Install it first."
+msgstr "No encuentro el binario ({bin}). Instálalo primero."
 
-#: gui/control_panel.py:613
-#, python-brace-format
-msgid "No encuentro el binario ({BIN})."
-msgstr "No encuentro el binario ({BIN})."
-
-#: gui/control_panel.py:447
-#, python-brace-format
-msgid "El teclado no respondió: {e}"
-msgstr "El teclado no respondió: {e}"
-
-#: gui/control_panel.py:449
-msgid "El teclado tardó demasiado en responder."
+#: gui/client.py:113
+msgid "The keyboard took too long to respond."
 msgstr "El teclado tardó demasiado en responder."
 
-#: gui/control_panel.py:546
+#: gui/client.py:115 gui/client.py:207
 #, python-brace-format
-msgid "{nombre} aplicado"
-msgstr "{nombre} aplicado"
+msgid "The keyboard did not respond: {e}"
+msgstr "El teclado no respondió: {e}"
 
-#: gui/control_panel.py:556
+#: gui/client.py:121
 #, python-brace-format
-msgid "Tu tono #{hexv} aplicado"
-msgstr "Tu tono #{hexv} aplicado"
+msgid "The keyboard did not respond (code {code})."
+msgstr "El teclado no respondió (código {code})."
 
-#: gui/control_panel.py:611
-#, python-brace-format
-msgid "Movimiento {mode} en marcha"
-msgstr "Movimiento {mode} en marcha"
+#: gui/colors.py:17
+msgid "White"
+msgstr "Blanco"
 
-#: gui/control_panel.py:631
-msgid "Luz fijada de nuevo"
-msgstr "Luz fijada de nuevo"
+#: gui/colors.py:18
+msgid "Tungsten"
+msgstr "Tungsteno"
 
-#: gui/window.py:700
-msgid "Sin acceso al teclado"
-msgstr "Sin acceso al teclado"
+#: gui/colors.py:19
+msgid "Orange"
+msgstr "Naranja"
 
-#: gui/window.py:700
-msgid "No se pudo hablar con el teclado. Suele ser un permiso del sistema y se arregla con un clic."
-msgstr "No se pudo hablar con el teclado. Suele ser un permiso del sistema y se arregla con un clic."
+#: gui/colors.py:20
+msgid "Red"
+msgstr "Rojo"
 
-#: gui/window.py:700
-msgid "No se pudo hablar con el teclado. Instálalo a mano y reintenta: install -m644 ~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=hidraw"
-msgstr "No se pudo hablar con el teclado. Instálalo a mano y reintenta: install -m644 ~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=hidraw"
+#: gui/colors.py:21
+msgid "Pink"
+msgstr "Rosa"
 
-#: gui/window.py:700
-msgid "Instalar permiso"
-msgstr "Instalar permiso"
+#: gui/colors.py:22
+msgid "Purple"
+msgstr "Púrpura"
 
-#: gui/window.py:700
-msgid "Reintentar"
-msgstr "Reintentar"
+#: gui/colors.py:23
+msgid "Ultraviolet"
+msgstr "Ultravioleta"
 
-#: gui/settings.py:247
-msgid "Restaurar color ahora"
-msgstr "Restaurar color ahora"
+#: gui/colors.py:24
+msgid "Blue"
+msgstr "Azul"
 
-#: gui/settings.py:247
-msgid "Aplica el último color guardado."
-msgstr "Aplica el último color guardado."
+#: gui/colors.py:25
+msgid "Cyan"
+msgstr "Cian"
 
-#: gui/settings.py:262
-msgid "Dispositivo"
-msgstr "Dispositivo"
+#: gui/colors.py:26
+msgid "Green"
+msgstr "Verde"
 
-#: gui/tray.py:211
-msgid "Abrir ventana"
-msgstr "Abrir ventana"
+#: gui/colors.py:27
+msgid "Off"
+msgstr "Apagado"
 
-#: gui/tray.py:221
-msgid "Brillo"
-msgstr "Brillo"
+#: gui/preview.py:48 gui/tray.py:285 gui/window.py:252
+msgid "Breathe"
+msgstr "Respirar"
 
-#: gui/tray.py:223
-msgid "Colores"
-msgstr "Colores"
+#: gui/preview.py:50 gui/tray.py:286 gui/window.py:252
+msgid "Rainbow"
+msgstr "Arcoíris"
 
-#: gui/tray.py:264
-msgid "Tu tono…"
-msgstr "Tu tono…"
+#: gui/preview.py:51 gui/tray.py:284 gui/window.py:252
+msgid "Steady"
+msgstr "Fijar"
 
-#: gui/tray.py:226
-msgid "Animaciones"
-msgstr "Animaciones"
-
-#: gui/tray.py:231
-msgid "Apagar"
-msgstr "Apagar"
-
-#: gui/tray.py:236
-msgid "Restaurar"
-msgstr "Restaurar"
-
-#: gui/tray.py:243
-msgid "Preferencias"
+#: gui/settings.py:189 gui/tray.py:220 gui/window.py:202
+msgid "Preferences"
 msgstr "Preferencias"
 
-#: gui/tray.py:254
-msgid "Salir"
+#: gui/settings.py:196
+msgid "Appearance"
+msgstr "Apariencia"
+
+#: gui/settings.py:201
+msgid "Theme"
+msgstr "Tema"
+
+#: gui/settings.py:202
+msgid "System"
+msgstr "Sistema"
+
+#: gui/settings.py:202
+msgid "Light"
+msgstr "Claro"
+
+#: gui/settings.py:202
+msgid "Dark"
+msgstr "Oscuro"
+
+#: gui/settings.py:215
+msgid "Stage effects"
+msgstr "Efectos del escenario"
+
+#: gui/settings.py:216
+msgid "Particles and animation in the preview."
+msgstr "Partículas y animación en la vista previa."
+
+#: gui/settings.py:228
+msgid "Behavior"
+msgstr "Comportamiento"
+
+#: gui/settings.py:233
+msgid "Launch at login"
+msgstr "Arranque automático"
+
+#: gui/settings.py:234
+msgid "Open in the tray when the session starts."
+msgstr "Abrir en la bandeja al iniciar la sesión."
+
+#: gui/settings.py:243
+msgid "Restore color at startup"
+msgstr "Restaurar color al iniciar"
+
+#: gui/settings.py:244
+msgid "Apply the last color when opening."
+msgstr "Aplicar el último color al abrir."
+
+#: gui/settings.py:253
+msgid "Restore color now"
+msgstr "Restaurar color ahora"
+
+#: gui/settings.py:254
+msgid "Applies the last saved color."
+msgstr "Aplica el último color guardado."
+
+#: gui/settings.py:262 gui/tray.py:226
+msgid "About"
+msgstr "Acerca de"
+
+#: gui/settings.py:268
+msgid "Version"
+msgstr "Versión"
+
+#: gui/settings.py:272
+msgid "License"
+msgstr "Licencia"
+
+#: gui/settings.py:276
+msgid "Source code"
+msgstr "Código fuente"
+
+#: gui/settings.py:282
+msgid "Device"
+msgstr "Dispositivo"
+
+#: gui/settings.py:350 gui/settings.py:354 gui/window.py:577
+msgid "no keyboard in sight"
+msgstr "sin teclado a la vista"
+
+#: gui/settings.py:351 gui/window.py:195 gui/window.py:575
+msgid "looking at the keyboard…"
+msgstr "mirando el teclado…"
+
+#: gui/settings.py:364 gui/window.py:573
+msgid "zone(s)"
+msgstr "zona(s)"
+
+#: gui/tray.py:202
+msgid "Open window"
+msgstr "Abrir ventana"
+
+#: gui/tray.py:207
+msgid "Colors"
+msgstr "Colores"
+
+#: gui/tray.py:210
+msgid "Animations"
+msgstr "Animaciones"
+
+#: gui/tray.py:213
+msgid "Turn off"
+msgstr "Apagar"
+
+#: gui/tray.py:217
+msgid "Restore"
+msgstr "Restaurar"
+
+#: gui/tray.py:232
+msgid "Quit"
 msgstr "Salir"
 
-#: gui/window.py:819
-msgid "Permiso no instalado (pkexec cancelado o sin autorización)."
-msgstr "Permiso no instalado (pkexec cancelado o sin autorización)."
+#: gui/tray.py:253 gui/window.py:283
+msgid "Brightness"
+msgstr "Brillo"
 
-#: gui/window.py
-msgid "Tono personalizado"
+#: gui/tray.py:273 gui/tray.py:502
+msgid "Your shade…"
+msgstr "Tu tono…"
+
+#: gui/window.py:245
+msgid "How it moves"
+msgstr "Cómo se mueve"
+
+#: gui/window.py:246
+msgid "Hold the light steady or let it breathe."
+msgstr "Fija la luz o déjala respirar."
+
+#: gui/window.py:259
+msgid "Stop motion"
+msgstr "Parar movimiento"
+
+#: gui/window.py:266
+msgid "How much light you want"
+msgstr "Cuánta luz quieres"
+
+#: gui/window.py:267
+msgid "Slide or use − / + . It saves itself."
+msgstr "Desliza o usa − / + . Se guarda solo."
+
+#: gui/window.py:289
+msgid "Lower brightness"
+msgstr "Bajar brillo"
+
+#: gui/window.py:291
+msgid "Raise brightness"
+msgstr "Subir brillo"
+
+#: gui/window.py:302
+msgid "Choose your light"
+msgstr "Elige tu luz"
+
+#: gui/window.py:303
+msgid "Tap a filter or create your own shade."
+msgstr "Toca un filtro o crea tu propio tono."
+
+#: gui/window.py:336
+msgid "Custom shade"
 msgstr "Tono personalizado"
 
+#: gui/window.py:387
+msgid "Something went wrong"
+msgstr "Algo no salió"
+
+#: gui/window.py:388 gui/window.py:805
+msgid "Got it"
+msgstr "Entendido"
+
+#: gui/window.py:434
+msgid "Could not set the color"
+msgstr "No se pudo fijar el color"
+
+#: gui/window.py:444
+msgid "Could not adjust the brightness"
+msgstr "No se pudo ajustar el brillo"
+
+#: gui/window.py:451
+msgid "Could not stop"
+msgstr "No se pudo parar"
+
+#: gui/window.py:462
+msgid "Could not start the animation"
+msgstr "No se pudo arrancar la animación"
+
+#: gui/window.py:464
+#, python-brace-format
+msgid "{mode} motion running"
+msgstr "Movimiento {mode} en marcha"
+
+#: gui/window.py:563
+#, python-brace-format
+msgid "moving (pid {pid})"
+msgstr "moviéndose (pid {pid})"
+
+#: gui/window.py:568
+msgid "steady light"
+msgstr "luz fija"
+
+#: gui/window.py:590
+msgid "Your shade"
+msgstr "Tu tono"
+
+#: gui/window.py:612
+#, python-brace-format
+msgid "{nombre} applied"
+msgstr "{nombre} aplicado"
+
+#: gui/window.py:629
+#, python-brace-format
+msgid "Your shade #{hexv} applied"
+msgstr "Tu tono #{hexv} aplicado"
+
+#: gui/window.py:695
+msgid "Light steady again"
+msgstr "Luz fijada de nuevo"
+
+#: gui/window.py:793
+msgid ""
+"Could not talk to the keyboard. It is usually a system permission and one "
+"click fixes it."
+msgstr ""
+"No se pudo hablar con el teclado. Suele ser un permiso del sistema y se "
+"arregla con un clic."
+
+#: gui/window.py:795
+msgid ""
+"Could not talk to the keyboard. Install it by hand and retry: install -m644 "
+"~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-"
+"keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --"
+"subsystem-match=hidraw"
+msgstr ""
+"No se pudo hablar con el teclado. Instálalo a mano y reintenta: install "
+"-m644 ~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-"
+"keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --"
+"subsystem-match=hidraw"
+
+#: gui/window.py:797
+msgid "No keyboard access"
+msgstr "Sin acceso al teclado"
+
+#: gui/window.py:803
+msgid "Install permission"
+msgstr "Instalar permiso"
+
+#: gui/window.py:804
+msgid "Retry"
+msgstr "Reintentar"
+
+#: gui/window.py:840
+msgid "Permission not installed (pkexec cancelled or not authorized)."
+msgstr "Permiso no instalado (pkexec cancelado o sin autorización)."

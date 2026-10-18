@@ -199,37 +199,37 @@ class TrayIndicator:
 
     def _build_menu(self):
         menu = Gtk.Menu()
-        self._open_item = Gtk.MenuItem.new_with_label(_("Abrir ventana"))
+        self._open_item = Gtk.MenuItem.new_with_label(_("Open window"))
         self._open_item.connect("activate", self._ui_open)
         menu.append(self._open_item)
         menu.append(Gtk.SeparatorMenuItem())
         menu.append(self._build_brightness_item())
-        self._colors_item = Gtk.MenuItem.new_with_label(_("Colores"))
+        self._colors_item = Gtk.MenuItem.new_with_label(_("Colors"))
         self._colors_item.set_submenu(self._build_colors_menu())
         menu.append(self._colors_item)
-        self._anims_item = Gtk.MenuItem.new_with_label(_("Animaciones"))
+        self._anims_item = Gtk.MenuItem.new_with_label(_("Animations"))
         self._anims_item.set_submenu(self._build_modes_menu())
         menu.append(self._anims_item)
-        self._off_item = Gtk.MenuItem.new_with_label(_("Apagar"))
+        self._off_item = Gtk.MenuItem.new_with_label(_("Turn off"))
         self._off_item.connect("activate", self._do_off)
         menu.append(self._off_item)
         menu.append(Gtk.SeparatorMenuItem())
-        self._restore_item = Gtk.MenuItem.new_with_label(_("Restaurar"))
+        self._restore_item = Gtk.MenuItem.new_with_label(_("Restore"))
         self._restore_item.connect("activate", self._do_restore)
         menu.append(self._restore_item)
-        self._prefs_item = Gtk.MenuItem.new_with_label(_("Preferencias"))
+        self._prefs_item = Gtk.MenuItem.new_with_label(_("Preferences"))
         if self._on_preferences is None:
             self._prefs_item.set_sensitive(False)
         else:
             self._prefs_item.connect("activate", self._ui_preferences)
         menu.append(self._prefs_item)
-        self._about_item = Gtk.MenuItem.new_with_label(_("Acerca de"))
+        self._about_item = Gtk.MenuItem.new_with_label(_("About"))
         if self._on_about is None:
             self._about_item.set_sensitive(False)
         else:
             self._about_item.connect("activate", self._ui_about)
         menu.append(self._about_item)
-        self._quit_item = Gtk.MenuItem.new_with_label(_("Salir"))
+        self._quit_item = Gtk.MenuItem.new_with_label(_("Quit"))
         self._quit_item.connect("activate", self._ui_quit)
         menu.append(self._quit_item)
         menu.show_all()
@@ -250,7 +250,7 @@ class TrayIndicator:
         self._scale.set_value(self._brightness)
         self._scale.connect("value-changed", self._on_scale_brillo)
         caja = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        caja.pack_start(Gtk.Label(label=_("Brillo")), False, False, 6)
+        caja.pack_start(Gtk.Label(label=_("Brightness")), False, False, 6)
         caja.pack_start(self._scale, True, True, 6)
         item = Gtk.MenuItem()
         item.add(caja)
@@ -270,7 +270,7 @@ class TrayIndicator:
             submenu.append(item)
             self._color_items[hexv] = item
         submenu.append(Gtk.SeparatorMenuItem())
-        self._custom_item = Gtk.MenuItem.new_with_label(_("Tu tono…"))
+        self._custom_item = Gtk.MenuItem.new_with_label(_("Your shade…"))
         self._custom_item.connect("activate", self._do_custom_tone)
         submenu.append(self._custom_item)
         submenu.show_all()
@@ -281,9 +281,9 @@ class TrayIndicator:
         self._mode_items = {}
         grupo = None
         for key, label in (
-            ("fijar", _("Fijar")),
-            ("breathe", _("Respirar")),
-            ("rainbow", _("Arcoíris")),
+            ("fijar", _("Steady")),
+            ("breathe", _("Breathe")),
+            ("rainbow", _("Rainbow")),
         ):
             if grupo is None:
                 item = Gtk.RadioMenuItem.new_with_label(None, label)
@@ -499,7 +499,7 @@ class TrayIndicator:
     def _do_custom_tone(self, *args):
         dlg = None
         try:
-            dlg = Gtk.ColorChooserDialog(title=_("Tu tono…"))
+            dlg = Gtk.ColorChooserDialog(title=_("Your shade…"))
             respuesta = dlg.run()
             if respuesta == Gtk.ResponseType.OK:
                 rgba = dlg.get_rgba()

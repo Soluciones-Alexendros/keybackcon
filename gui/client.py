@@ -6,7 +6,14 @@ import subprocess
 
 try:
     from gui import log_exc
+    from gui.i18n import _
 except ImportError:  # ejecución directa: gui/ en sys.path
+    try:
+        from i18n import _
+    except ImportError:
+        def _(s):
+            return s
+
     def log_exc(contexto):
         import sys
 
@@ -98,18 +105,22 @@ class KeybackconClient:
             )
         except FileNotFoundError:
             raise KeybackconError(
-                f"No encuentro el binario ({self._bin}). Instálalo primero."
+                _("Cannot find the binary ({bin}). Install it first.").format(
+                    bin=self._bin
+                )
             )
         except subprocess.TimeoutExpired:
-            raise KeybackconError("El teclado tardó demasiado en responder.")
+            raise KeybackconError(_("The keyboard took too long to respond."))
         except OSError as e:
-            raise KeybackconError(f"El teclado no respondió: {e}")
+            raise KeybackconError(_("The keyboard did not respond: {e}").format(e=e))
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
             if err:
                 raise KeybackconError(err)
             raise KeybackconError(
-                f"El teclado no respondió (código {proc.returncode})."
+                _("The keyboard did not respond (code {code}).").format(
+                    code=proc.returncode
+                )
             )
         return proc
 
@@ -188,10 +199,12 @@ class KeybackconClient:
             )
         except FileNotFoundError:
             raise KeybackconError(
-                f"No encuentro el binario ({self._bin}). Instálalo primero."
+                _("Cannot find the binary ({bin}). Install it first.").format(
+                    bin=self._bin
+                )
             )
         except OSError as e:
-            raise KeybackconError(f"El teclado no respondió: {e}")
+            raise KeybackconError(_("The keyboard did not respond: {e}").format(e=e))
 
     def stop(self) -> str:
         self.stop_animation()

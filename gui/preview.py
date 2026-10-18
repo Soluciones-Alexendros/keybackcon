@@ -45,10 +45,10 @@ def animations_enabled():
 
 def mode_label(mode):
     if mode == "breathe":
-        return _("Respirar")
+        return _("Breathe")
     if mode == "rainbow":
-        return _("Arcoíris")
-    return _("Fijar")
+        return _("Rainbow")
+    return _("Steady")
 
 
 def resolve_color(color_hex, pct, mode, t, animate):

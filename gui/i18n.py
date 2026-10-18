@@ -45,6 +45,16 @@ def get_language() -> str:
     return _current_lang
 
 
+def N_(message: str) -> str:
+    """Marca una cadena como traducible sin traducirla.
+
+    Para literales que se traducen en el punto de uso (p. ej. los nombres de
+    color de ``colors.py``): xgettext la extrae y el ``_()`` del consumidor
+    resuelve el idioma activo.
+    """
+    return message
+
+
 def setup_i18n(lang: str | None = None) -> str:
     if lang is None:
         try:
