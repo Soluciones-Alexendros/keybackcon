@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 import os
 import sys
+import warnings
 
 APP_ID = "org.iniciativas.keybackcon"
 
 DBUS_NAME = "org.iniciativas.keybackcon"
 DBUS_PATH = "/org/iniciativas/keybackcon"
 DBUS_CONTROL_IFACE = "org.iniciativas.keybackcon.Control"
+CONTROL_METHODS = ("Toggle", "Present", "Quit")
+CONTROL_TIMEOUT_MS = 1500
 CONTROL_XML = """
 <node>
   <interface name="org.iniciativas.keybackcon.Control">
@@ -150,6 +153,50 @@ def _aviso_falta(que, exc, rol):
     print(f"  ({exc})", file=sys.stderr)
 
 
+def control_action(method, actions):
+    """Acción asociada a un método de la interfaz de control.
+
+    ``actions`` mapea nombre de método -> callable. Devuelve ``None`` si el
+    método no forma parte del contrato, para que el llamante no delegue nada.
+    Pura: no toca GLib ni el bus.
+    """
+    return actions.get(method)
+
+
+def register_control(conn, actions):
+    """Registra la interfaz de control en ``conn``.
+
+    Cada método de ``CONTROL_XML`` despacha hacia su acción con
+    ``GLib.idle_add`` (el método D-Bus no puede tocar GTK desde el bus).
+    Devuelve True si el registro se completó; False si no hay conexión o
+    falló. Un método desconocido se responde sin delegar.
+    """
+    if conn is None:
+        return False
+    try:
+        from gi.repository import Gio, GLib
+
+        info = Gio.DBusNodeInfo.new_for_xml(CONTROL_XML)
+        iface = info.interfaces[0]
+
+        def method_call(_conn, _sender, _path, _iface, method, _params,
+                        invocation):
+            accion = control_action(method, actions)
+            if accion is not None:
+                GLib.idle_add(accion)
+            invocation.return_value(None)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", message=".*register_object is deprecated.*"
+            )
+            conn.register_object(DBUS_PATH, iface, method_call)
+        return True
+    except Exception:
+        log_exc("registrar control D-Bus")
+        return False
+
+
 def _llamar_control(metodo):
     """Llama a la ventana viva por D-Bus. Devuelve True si respondió;
     False si no hay ventana (o no respondió), en cuyo caso toca lanzarla."""
@@ -165,7 +212,7 @@ def _llamar_control(metodo):
             None,
             None,
             Gio.DBusCallFlags.NONE,
-            1500,
+            CONTROL_TIMEOUT_MS,
             None,
         )
         return True
@@ -179,7 +226,7 @@ def _run_window(open_preferences=False, hide_on_close=False):
 
         gi.require_version("Gtk", "4.0")
         gi.require_version("Adw", "1")
-        from gi.repository import Adw, GLib, Gio
+        from gi.repository import Adw, GLib
     except Exception as exc:
         _aviso_falta("GTK4/libadwaita (python3-gi)", exc, "gui")
         return 1
@@ -233,32 +280,14 @@ def _run_window(open_preferences=False, hide_on_close=False):
             # Solo la ventana hija de la bandeja acepta control remoto; la
             # instancia del menú de apps es autónoma.
             return
-        try:
-            conn = app.get_dbus_connection()
-            if conn is None:
-                return
-            info = Gio.DBusNodeInfo.new_for_xml(CONTROL_XML)
-            iface = info.interfaces[0]
-
-            def method_call(conn, _sender, _path, _iface, method, _params,
-                            invocation):
-                if method == "Toggle":
-                    GLib.idle_add(_toggle_window)
-                elif method == "Present":
-                    GLib.idle_add(_present_window)
-                elif method == "Quit":
-                    GLib.idle_add(lambda: (app.quit(), False)[1])
-                invocation.return_value(None)
-
-            import warnings
-
-            with warnings.catch_warnings():
-                warnings.filterwarnings(
-                    "ignore", message=".*register_object is deprecated.*"
-                )
-                conn.register_object(DBUS_PATH, iface, method_call)
-        except Exception:
-            log_exc("registrar control D-Bus")
+        register_control(
+            app.get_dbus_connection(),
+            {
+                "Toggle": _toggle_window,
+                "Present": _present_window,
+                "Quit": lambda: (app.quit(), False)[1],
+            },
+        )
 
     def on_activate(app):
         def on_preferences():
