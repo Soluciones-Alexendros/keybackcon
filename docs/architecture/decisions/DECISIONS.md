@@ -21,6 +21,7 @@
 | 11 | Cota `HID_IOCTL_MAX_LEN` en el ioctl | Aceptada | Rechazar en construcción lo que el campo size de 14 bits no puede codificar. |
 | 12 | Alineación al canon P0+P1+P2 | Aceptada | Jobs `quality`/`test`/`build`/`smoke`, docs canónicos y Renovate; sin clonar stacks ajenos. |
 | 13 | Exclusión por descriptor y un solo escritor | Aceptada, enmendada | Todo escritor HID toma el mismo `flock` en `/run/keybackcon/writer.lock`. Sin daemon. La sesión activa no es una política adicional. |
+| 14 | i18n de la GUI: msgids en inglés, catálogos `es`/`en` | Aceptada | La GUI usa gettext con msgids en inglés; `es.po` traduce y `en.po` es identidad. El CLI Rust no se traduce. |
 
 ## 1. Nombre: `keybackcon` / "Keyboard Backlight Controls"
 Un solo nombre corto para binario, repo y App ID (`org.iniciativas.keybackcon`);
@@ -160,3 +161,25 @@ enmienda. Los errores HID conservan `raw_os_error()` del `io::Error`
 original. Motivo de la enmienda: el `flock` vivía solo en la animación y
 en el runtime del usuario, así que un `set` concurrente o la sesión de
 otro usuario quedaban fuera del mismo contrato.
+
+## 14. i18n de la GUI: msgids en inglés, catálogos `es`/`en`
+La mesa de luz usa gettext con **msgids en inglés** (idioma fuente) y dos
+catálogos completos: `po/es.po` traduce al español y `po/en.po` es la
+identidad. `gui/i18n.py` resuelve el idioma con `SUPPORTED_LOCALES =
+{es, en}` y cae a español si el locale del sistema no está soportado. Los
+nombres de color de `gui/colors.py` se marcan con `N_` (extraíble, sin
+traducir) y se traducen en el punto de uso, porque los consumidores ya
+llamaban a `_(nombre)`.
+
+El **CLI Rust no se traduce**: sus mensajes siguen en español por
+decisión de identidad del proyecto, igual que el binario no depende de
+ninguna biblioteca de i18n (ADR 2). Los `.mo` se compilan con `make i18n`
+(o `msgfmt` en `install.sh` y los empaquetadores) y **no se versionan**.
+`make check-i18n` y `scripts/check-i18n.py` comparan `.pot` y `.po`
+(msgids, cadenas vacías, duplicados y `fuzzy`).
+
+Motivo: las cadenas fuente en español con traducción identidad ataban el
+proyecto a un solo idioma y dejaban el `.pot` fuera de sincronía con el
+código (los msgids apuntaban a `control_panel.py`, hoy un shim de
+`window.py`). Fuente en inglés y catálogos reales es el formato estándar
+de gettext y no obliga a renombrar msgids al añadir idiomas.

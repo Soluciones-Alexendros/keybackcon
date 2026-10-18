@@ -97,6 +97,10 @@ Contrato de brillo, apagado, restauración y JSON:
 
 Atajos de la GUI: `Ctrl+1…9` cambia de filtro, `+`/`−` ajusta intensidad.
 
+Idioma: la mesa de luz sigue el locale del sistema y trae catálogos
+completos en **español** e **inglés** (cae a español si el locale no está
+soportado). El CLI no se traduce.
+
 ## Cómo funciona
 
 - Habla directamente con el teclado por USB: el CLI es el único escritor; sin

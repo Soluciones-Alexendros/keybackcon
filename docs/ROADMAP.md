@@ -33,9 +33,6 @@ merge del bot no vuelve a disparar el workflow.
 - [ ] **RPM (spec + COPR)** o **Flatpak** — Flatpak queda limitado porque la
       regla udev necesita un paso manual fuera del sandbox; si se hace, hay
       que documentarlo. Decisión pendiente según demanda.
-- [ ] **i18n real** — hoy los msgids son español con traducción identidad.
-      Migrar msgids a inglés y tener `es.po`/`en.po` completos (decisión:
-      migración completa vs. añadir `en.po` con msgids españoles).
 - [ ] **Más teclados** — hacer configurables la firma del descriptor HID y
       la regla udev (VID/PID) vía variable de entorno o flag, si aparece
       demanda de otros modelos LampArray.
@@ -62,3 +59,4 @@ merge del bot no vuelve a disparar el workflow.
 - [x] v2.3.0 (código) — parada sin bloqueos (zombies), estado atómico, validación estricta, `info --json`, cap de FPS, semántica de stop unificada, bandeja rediseñada, ventana Adwaita con apertura instantánea desde la bandeja (control D-Bus), autoversionado git-cliff, publicación npm, tests unitarios de la GUI (47) y compatibilidad multi-distribución
 - [x] v2.4.0 — un solo escritor HID, tag en la historia de `main`, `.deb` + tarball + SBOM en GitHub Releases
 - [x] v2.4.1 — `getgrnam` portable (aarch64), paquete npm publicado
+- [x] i18n real de la GUI — msgids en inglés y catálogos `es`/`en` completos (ADR 14)
