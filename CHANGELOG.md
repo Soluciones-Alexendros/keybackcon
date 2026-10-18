@@ -4,6 +4,24 @@ La fuente de verdad son los tags y `git-cliff`. Resumen:
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-10-18
+- GUI i18n real: msgids en inglés (idioma fuente) y catálogos completos
+  `es.po`/`en.po`; los nombres de color se traducen en el punto de uso (`N_`)
+  y los errores de `client.py`/`backend.py` dejan de estar sin envolver.
+  El `.pot` se regenera con `make i18n` y `make check-i18n` detecta deriva
+  fuente → `.pot` → `.po` (ADR 14).
+- Tests del control D-Bus de la ventana (`Toggle`/`Present`/`Quit`) con un
+  bus de sesión privado, sin tocar el bus del usuario (66 tests de GUI).
+- Release: `version.yml` idempotente cuando el PR de release ya existe y
+  `gui/locale/` + `tasks/` fuera del árbol versionado.
+
+## [2.4.1] — 2026-10-17
+- `getgrnam` portable (aarch64); paquete npm publicado.
+
+## [2.4.0] — 2026-10-17
+- Un solo escritor HID con candado en `/run/keybackcon/writer.lock` (ADR 13);
+  tag en la historia de `main` y release con `.deb` + tarball + SBOM.
+
 ## [2.3.0] — 2026-09-25
 - Núcleo: parada de animación sin bloqueos (reap de zombies, semántica de
   stop unificada), estado persistente atómico, validación estricta de

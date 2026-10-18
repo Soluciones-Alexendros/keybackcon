@@ -12,7 +12,7 @@ qué). Los hitos ya logrados van al final como histórico.
 
 ## En curso
 
-Nada listo para trabajar. v2.4.1 está en `main`, en GitHub Releases y en
+Nada listo para trabajar. v2.5.0 está en `main`, en GitHub Releases y en
 npm. El versionado etiqueta desde el mismo job que abre el PR, porque el
 merge del bot no vuelve a disparar el workflow.
 
@@ -24,9 +24,6 @@ merge del bot no vuelve a disparar el workflow.
 - [ ] **Prueba de `npm install -g` en máquina limpia** — v2.4.1 ya está en
       el registry. Falta instalarlo en un Debian y un Arch vacíos y
       comprobar el postinstalador.
-- [ ] **CI: tests de la GUI** — la suite `gui/tests` ya corre en el job
-      `gui-packaging`; añadir cobertura de `main.py` (D-Bus de control) con
-      un bus de sesión de prueba si se ve útil.
 
 ## Medio plazo
 
@@ -60,3 +57,5 @@ merge del bot no vuelve a disparar el workflow.
 - [x] v2.4.0 — un solo escritor HID, tag en la historia de `main`, `.deb` + tarball + SBOM en GitHub Releases
 - [x] v2.4.1 — `getgrnam` portable (aarch64), paquete npm publicado
 - [x] i18n real de la GUI — msgids en inglés y catálogos `es`/`en` completos (ADR 14)
+- [x] CI: tests de la GUI — cobertura del control D-Bus de `main.py` (`Toggle`/`Present`/`Quit`) con un bus de sesión privado en la suite
+- [x] v2.5.0 — i18n real (es/en), tests D-Bus de la ventana y release idempotente (`.deb` + tarball + SBOM + npm)
