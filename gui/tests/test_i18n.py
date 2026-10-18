@@ -19,6 +19,11 @@ def _catalogo(lang):
     return gettext.translation("keybackcon", localedir=LOCALE_DIR, languages=[lang])
 
 
+def _requiere_catalogo(lang):
+    """Salta si el `.mo` del idioma no está compilado."""
+    _catalogo(lang)
+
+
 class TestI18n(unittest.TestCase):
     def tearDown(self):
         i18n.setup_i18n("es")
@@ -64,6 +69,8 @@ class TestI18n(unittest.TestCase):
         self.assertEqual(tr.gettext("White"), "White")
 
     def test_setup_i18n_rebinda_el_guion_bajo(self):
+        _requiere_catalogo("es")
+        _requiere_catalogo("en")
         with mock.patch.object(i18n, "get_locale_dir", return_value=LOCALE_DIR):
             i18n.setup_i18n("es")
             self.assertEqual(i18n._("Preferences"), "Preferencias")

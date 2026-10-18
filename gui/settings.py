@@ -361,7 +361,8 @@ if Adw is not None:
                 hid = str(info.get("device") or "?")
                 lamps = info.get("lamps", "?")
                 try:
-                    texto = f"{hid} · {lamps} {_('zone(s)')}"
+                    zonas = _("zone(s)")
+                    texto = f"{hid} · {lamps} {zonas}"
                 except Exception:
                     log_exc("ficha de dispositivo")
             if GLib is not None:

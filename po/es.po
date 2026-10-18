@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: keybackcon 2.4.1\n"
 "Report-Msgid-Bugs-To: https://github.com/Soluciones-Alexendros/keybackcon/"
 "issues\n"
-"POT-Creation-Date: 2026-10-18 22:04+0200\n"
+"POT-Creation-Date: 2026-10-18 22:07+0200\n"
 "PO-Revision-Date: 2026-10-18 00:00+0000\n"
 "Last-Translator: keybackcon <keybackcon@local>\n"
 "Language-Team: Spanish\n"
@@ -180,11 +180,11 @@ msgstr "Código fuente"
 msgid "Device"
 msgstr "Dispositivo"
 
-#: gui/settings.py:350 gui/settings.py:354 gui/window.py:577
+#: gui/settings.py:350 gui/settings.py:354 gui/window.py:579
 msgid "no keyboard in sight"
 msgstr "sin teclado a la vista"
 
-#: gui/settings.py:351 gui/window.py:195 gui/window.py:575
+#: gui/settings.py:351 gui/window.py:195 gui/window.py:576
 msgid "looking at the keyboard…"
 msgstr "mirando el teclado…"
 
@@ -268,7 +268,7 @@ msgstr "Tono personalizado"
 msgid "Something went wrong"
 msgstr "Algo no salió"
 
-#: gui/window.py:388 gui/window.py:805
+#: gui/window.py:388 gui/window.py:808
 msgid "Got it"
 msgstr "Entendido"
 
@@ -302,25 +302,25 @@ msgstr "moviéndose (pid {pid})"
 msgid "steady light"
 msgstr "luz fija"
 
-#: gui/window.py:590
+#: gui/window.py:593
 msgid "Your shade"
 msgstr "Tu tono"
 
-#: gui/window.py:612
+#: gui/window.py:615
 #, python-brace-format
 msgid "{nombre} applied"
 msgstr "{nombre} aplicado"
 
-#: gui/window.py:629
+#: gui/window.py:632
 #, python-brace-format
 msgid "Your shade #{hexv} applied"
 msgstr "Tu tono #{hexv} aplicado"
 
-#: gui/window.py:695
+#: gui/window.py:698
 msgid "Light steady again"
 msgstr "Luz fijada de nuevo"
 
-#: gui/window.py:793
+#: gui/window.py:796
 msgid ""
 "Could not talk to the keyboard. It is usually a system permission and one "
 "click fixes it."
@@ -328,7 +328,7 @@ msgstr ""
 "No se pudo hablar con el teclado. Suele ser un permiso del sistema y se "
 "arregla con un clic."
 
-#: gui/window.py:795
+#: gui/window.py:798
 msgid ""
 "Could not talk to the keyboard. Install it by hand and retry: install -m644 "
 "~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-"
@@ -340,18 +340,18 @@ msgstr ""
 "keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --"
 "subsystem-match=hidraw"
 
-#: gui/window.py:797
+#: gui/window.py:800
 msgid "No keyboard access"
 msgstr "Sin acceso al teclado"
 
-#: gui/window.py:803
+#: gui/window.py:806
 msgid "Install permission"
 msgstr "Instalar permiso"
 
-#: gui/window.py:804
+#: gui/window.py:807
 msgid "Retry"
 msgstr "Reintentar"
 
-#: gui/window.py:840
+#: gui/window.py:843
 msgid "Permission not installed (pkexec cancelled or not authorized)."
 msgstr "Permiso no instalado (pkexec cancelado o sin autorización)."
