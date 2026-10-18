@@ -11,7 +11,7 @@ Checklist ejecutable (en orden; la fachada es `make validate`):
 - [ ] `make lint` — fmt, clippy `--all-targets -D warnings`, rustdoc, `py_compile` de `gui/*.py`
 - [ ] `make test` — `cargo test -- --test-threads=1` (43 tests; los de pid usan `XDG_RUNTIME_DIR` temporal)
 - [ ] `make i18n` — regenera `po/keybackcon.pot` y compila los `.mo` en `gui/locale/` (los tests de i18n los necesitan)
-- [ ] `python3 -m unittest discover -s gui/tests` — 57 tests de la GUI (sin display ni hardware)
+- [ ] `python3 -m unittest discover -s gui/tests` — 66 tests de la GUI (sin display ni hardware; el control D-Bus necesita `python3-gi` y `dbus-daemon`)
 - [ ] `make check-i18n` — coherencia `.pot`/`.po` y sin cadenas sin traducir
 - [ ] `make smoke` — `./scripts/smoke.sh` (binario + GUI + packaging + tests unitarios)
 - [ ] `./scripts/install.sh` — instala en `~/.local` + udev (sudo) + unidades de usuario
@@ -23,11 +23,17 @@ Checklist ejecutable (en orden; la fachada es `make validate`):
   directorio ejecutable — ojo: algunos `/tmp` son `noexec`), `colors`,
   `theme` (vía archivo, con GSettings aislado), `i18n` (catálogos `po/*.po`;
   los que cargan `.mo` hacen skip si no se ejecutó `make i18n`), `compat`
-  (detección de distro con `/etc/os-release` emulado) y los helpers de la
-  bandeja. Los
+  (detección de distro con `/etc/os-release` emulado), los helpers de la
+  bandeja y el control D-Bus (`test_dbus_control.py`). Los
   tests de bandeja hacen skip si Gtk3/Ayatana faltan o si Gtk4 ya está
   cargado en el proceso (incompatibilidad GTK3/GTK4 documentada); en ese
   caso corren aislados: `python3 -m unittest gui.tests.test_tray_helpers`.
+- **Control D-Bus**: `test_dbus_control.py` arranca un `dbus-daemon` de
+  sesión privado (nunca toca el bus del usuario) y comprueba el contrato de
+  `CONTROL_XML`, el despacho de `Toggle`/`Present`/`Quit` y `_llamar_control`
+  contra un servicio en otro proceso. Requiere `python3-gi` y
+  `dbus-daemon`; en CI (`KEYBACKCON_REQUIRE_DBUS=1`) su ausencia falla en vez
+  de saltarse la cobertura.
 - **Lints**: `Cargo.toml` activa `missing_docs` y el grupo
   `clippy::pedantic`; deben quedar limpios con
   `cargo clippy --all-targets -- -D warnings` (incluidos ejemplos y tests)
