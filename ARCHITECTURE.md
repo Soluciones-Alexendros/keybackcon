@@ -119,9 +119,17 @@ ventana como subproceso trackeado que mata y reaped al salir. El cierre es
 limpio (sin `os._exit`), así `client.stop()` siempre se ejecuta.
 
 La GUI tiene suite de tests unitarios en `gui/tests/` (cliente con binario
-fake, colores, tema, i18n, helpers de bandeja) y `gui/compat.py` detecta la
+fake, colores, tema, i18n, helpers de bandeja, control D-Bus) y
+`gui/compat.py` detecta la
 distribución (`/etc/os-release`) para sugerir el comando de instalación de
 las dependencias en cada familia de paquetes (apt/pacman/dnf/zypper).
+
+La bandeja manda la ventana por D-Bus: la interfaz
+`org.iniciativas.keybackcon.Control` (`Toggle`/`Present`/`Quit`, ver
+`CONTROL_XML`) la registra la ventana hija y `gui/main.py` la despacha con
+`GLib.idle_add` para no tocar GTK desde el bus. Solo la instancia
+`--tray-child` acepta control remoto. La suite arranca un bus de sesión
+privado para cubrir el contrato, el despacho y la llamada entre procesos.
 
 La i18n de la GUI es gettext con **msgids en inglés** (`po/keybackcon.pot`)
 y catálogos `po/es.po` y `po/en.po`; `gui/i18n.py` resuelve el idioma y
