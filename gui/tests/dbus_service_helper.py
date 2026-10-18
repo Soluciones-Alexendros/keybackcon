@@ -23,6 +23,7 @@ from gi.repository import Gio, GLib  # noqa: E402
 from gui import main as gui_main  # noqa: E402
 
 TIMEOUT_MS = 30_000
+LLAMADA_MS = 5_000
 
 
 def _poseer_nombre(conn):
@@ -34,7 +35,7 @@ def _poseer_nombre(conn):
         GLib.Variant("(su)", (gui_main.DBUS_NAME, 0)),
         None,
         Gio.DBusCallFlags.NONE,
-        -1,
+        LLAMADA_MS,
         None,
     )
     return reply.unpack()[0] == 1  # DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
