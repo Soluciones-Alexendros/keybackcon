@@ -55,8 +55,12 @@ jobs:
       - name: Generar .mo (i18n para el .deb)
         run: |
           command -v msgfmt >/dev/null 2>&1 || sudo apt-get install -y gettext
-          mkdir -p gui/locale/es/LC_MESSAGES
-          msgfmt -o gui/locale/es/LC_MESSAGES/keybackcon.mo po/es.po
+          for po in po/*.po; do
+            lang=$(basename "$po" .po)
+            mkdir -p "gui/locale/$lang/LC_MESSAGES"
+            msgfmt -o "gui/locale/$lang/LC_MESSAGES/keybackcon.mo" "$po"
+          done
+          python3 scripts/check-i18n.py
       - name: Construir .deb (cargo-deb)
         run: cargo deb --no-build
       - name: Generar SBOM (CycloneDX)
