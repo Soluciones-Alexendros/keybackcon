@@ -52,6 +52,12 @@ except Exception:
 
 _ = gettext_func()
 
+try:
+    N_ = load("i18n").N_
+except Exception:
+    def N_(s):
+        return s
+
 
 APP_ID = "org.iniciativas.keybackcon"
 APP_TITLE = "Keyboard Backlight Controls"
@@ -590,7 +596,7 @@ class MesaWindow(Adw.ApplicationWindow):
                 btn.remove_css_class("selected")
 
     def _refresh_caption(self):
-        name = next((n for n, h in COLORES if h == self.cur_color), "Your shade")
+        name = next((n for n, h in COLORES if h == self.cur_color), N_("Your shade"))
         self.stage_caption.set_text(f"{_(name)} · #{self.cur_color} · {self.cur_pct}%")
         self.bright_value.set_text(f"{self.cur_pct}%")
         try:
