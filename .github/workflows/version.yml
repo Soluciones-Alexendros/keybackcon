@@ -8,6 +8,8 @@ name: Versionado
 # GITHUB_TOKEN no dispara workflows (recursión) y el PR de release se queda
 # sin los checks requeridos por main. El PAT encadena CI en la rama del PR y,
 # al empujar el tag, Release y NPM por `on: push: tags: v*`.
+# Sin RELEASE_PAT el job termina en verde con un notice y no publica
+# (checkout con token vacío fallaría; no se usa GITHUB_TOKEN como fallback).
 on:
   push:
     branches: [main]
@@ -21,17 +23,27 @@ jobs:
   bump:
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
+    env:
+      RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
     steps:
+      - name: Sin RELEASE_PAT — no-op
+        if: ${{ env.RELEASE_PAT == '' }}
+        run: |
+          echo "::notice::Falta el secret RELEASE_PAT. Crea un PAT (scopes repo y workflow) y guárdalo como secreto de repositorio RELEASE_PAT; sin él no hay PR de release ni tag. El job termina en verde."
+
       - uses: actions/checkout@v4
+        if: ${{ env.RELEASE_PAT != '' }}
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
 
       - name: Versión actual (Cargo.toml)
+        if: ${{ env.RELEASE_PAT != '' }}
         id: current
         run: echo "version=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
 
       - name: Instala git-cliff
+        if: ${{ env.RELEASE_PAT != '' }}
         run: |
           set -euo pipefail
           gh release download --repo orhun/git-cliff \
@@ -43,6 +55,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Bump calculado por git-cliff
+        if: ${{ env.RELEASE_PAT != '' }}
         id: cliff
         run: |
           set -uo pipefail
@@ -51,7 +64,7 @@ jobs:
           echo "bump calculado: '${BUMPED#v}'"
 
       - name: Sincronizar versiones y PR de release (sin tag)
-        if: steps.cliff.outputs.version != '' && steps.cliff.outputs.version != steps.current.outputs.version
+        if: ${{ env.RELEASE_PAT != '' && steps.cliff.outputs.version != '' && steps.cliff.outputs.version != steps.current.outputs.version }}
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
@@ -127,12 +140,21 @@ jobs:
     # y Actions no arranca el workflow.
     if: "${{ startsWith(github.event.head_commit.message, 'chore(release): prepara v') }}"
     runs-on: ubuntu-latest
+    env:
+      RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
     steps:
+      - name: Sin RELEASE_PAT — no-op
+        if: ${{ env.RELEASE_PAT == '' }}
+        run: |
+          echo "::notice::Falta el secret RELEASE_PAT. Crea un PAT (scopes repo y workflow) y guárdalo como secreto de repositorio RELEASE_PAT; sin él no se crea el tag ni se disparan Release/NPM. El job termina en verde."
+
       - uses: actions/checkout@v4
+        if: ${{ env.RELEASE_PAT != '' }}
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT }}
       - name: Crear tag sobre el commit fusionado y disparar publicación
+        if: ${{ env.RELEASE_PAT != '' }}
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
