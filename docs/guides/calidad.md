@@ -17,7 +17,7 @@
 
 El job extra `msrv` comprueba toolchain 1.87. No es required-name del canon; se conserva porque el crate declara `rust-version = "1.87"`.
 
-`release.yml` (tag `v*`) sigue aparte: tests, smoke, `.deb`, SBOM, attestation.
+`release.yml` (tag `v*`) sigue aparte: `cargo test/build --locked`, suite Python (unittest + xvfb como `quality`), smoke, `.deb`, SBOM, attestation.
 
 ## Cobertura
 
