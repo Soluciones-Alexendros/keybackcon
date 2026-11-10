@@ -179,23 +179,14 @@ mod tests {
 
     #[test]
     fn runtime_base_cae_a_tmp_por_uid_si_xdg_invalido() {
-        let _env = crate::TEST_ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        // SAFETY: TEST_ENV_LOCK serializa el entorno de tests.
-        unsafe {
-            std::env::remove_var("XDG_RUNTIME_DIR");
-            std::env::set_var("XDG_RUNTIME_DIR", "relativo/no-vale");
-        }
+        let mut env = crate::EnvGuard::lock();
+        env.set("XDG_RUNTIME_DIR", "relativo/no-vale");
         let base = runtime_base();
         let s = base.to_string_lossy();
         assert!(
             s.starts_with("/tmp/keybackcon-"),
             "esperado fallback por UID, obtuvo {s}"
         );
-        unsafe {
-            std::env::remove_var("XDG_RUNTIME_DIR");
-        }
     }
 
     fn scratch(tag: &str) -> PathBuf {

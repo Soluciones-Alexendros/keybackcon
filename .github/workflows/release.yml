@@ -31,8 +31,31 @@ jobs:
           check gui     gui/__init__.py         "$(grep -m1 '^__version__' gui/__init__.py | sed -E 's/.*\"([^\"]+)\".*/\1/')"
           check pkbuild packaging/aur/PKGBUILD "$(grep -m1 '^pkgver=' packaging/aur/PKGBUILD | sed -E 's/pkgver=//')"
           [ "$fail" = 0 ] || { echo "El tag v$TAG no coincide con alguna fuente de versión"; exit 1; }
-      - run: cargo test -- --test-threads=1
-      - run: cargo build --release
+      - run: cargo test --locked -- --test-threads=1
+      - run: cargo build --locked --release
+      - name: Árbol sin cambios tras build --locked
+        run: git diff --exit-code
+      - name: GUI py_compile
+        run: python3 -m py_compile gui/*.py
+      - name: Suite Python (alineada con quality de CI)
+        env:
+          KEYBACKCON_REQUIRE_DBUS: "1"
+          # Misma señal que quality (KBC-31): no deshacer al rebasear sobre #43.
+          KEYBACKCON_REQUIRE_GUI_SUITE: "1"
+          KEYBACKCON_GUI_TESTS: "1"
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            python3-gi \
+            gir1.2-glib-2.0 \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1 \
+            dbus \
+            xvfb
+          python3 -c "from gi.repository import Gio, GLib; print('GLib', GLib.MAJOR_VERSION, GLib.MINOR_VERSION)"
+          python3 -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; print('GTK', Gtk.get_major_version(), Gtk.get_minor_version(), 'Adw OK')"
+          GDK_BACKEND=x11 xvfb-run -a python3 -m unittest discover -s gui/tests -v
       - run: bash scripts/smoke.sh
       - name: Instalar herramientas de empaquetado
         run: |
