@@ -1,11 +1,5 @@
 # Documentación de keybackcon
 
-### Propósito de este documento
-
-- **Objetivos:** Indexar la documentación de producto (ADR, protocolo, guías y runbooks) y apuntar a los contratos de la raíz.
-- **Estructura:** Tabla de rutas `docs/` → enlaces a README, AGENTS, ARCHITECTURE, CONTRIBUTING y SECURITY.
-- **Contenido a integrar según contexto:** Adapta el índice al árbol de este repo. No copies guías de SaaS ni crates de HID ajenos. El protocolo no se reescribe fuera de `architecture/protocol.md` y `src/protocol.rs`.
-
 | Ruta | Para qué |
 | ---- | -------- |
 | [architecture/protocol.md](./architecture/protocol.md) | Bytes del cable LampArray HID |

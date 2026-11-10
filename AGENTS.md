@@ -1,11 +1,5 @@
 # AGENTS.md
 
-### Propósito de este documento
-
-- **Objetivos:** Fijar el contrato operativo para agentes de código y el rol Mantenedor: fuentes de verdad, autonomía, comandos y Definition of Done.
-- **Estructura:** Destinatarios → fuentes de verdad → unidad de trabajo → autonomía → stack y comandos → convenciones → layout → Definition of Done.
-- **Contenido a integrar según contexto:** Adapta Cargo, GUI GTK y `scripts/smoke.sh` de este repo. No copies un `AGENTS.md` de landing/SaaS ni crates de HID ajenos. No reutilices `release.yml` ni añadas dependencias Cargo sin ADR.
-
 **Destinatarios:** agentes de código y el rol Mantenedor que trabajen en este repositorio.  
 **Propósito:** contrato operativo. Homogeneizamos **nombres y contratos**, no el lenguaje ni la API del producto.
 

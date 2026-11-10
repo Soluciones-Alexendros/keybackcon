@@ -40,53 +40,28 @@ def _fix_path():
             sys.path.insert(0, path)
 
 
-def _ensure_gui_package():
-    """Garantiza que `import gui` funcione aunque main.py corra suelto.
-
-    El lanzador instalado ejecuta `python3 <dir>/main.py`, sin paquete
-    `gui/` alrededor; en ese caso cargamos __init__.py como módulo `gui`.
-    """
-    try:
-        import gui  # noqa: F401
-
-        return
-    except ImportError:
-        pass
-    here = os.path.dirname(os.path.abspath(__file__))
-    init = os.path.join(here, "__init__.py")
-    if not os.path.isfile(init):
-        return
-    try:
-        import importlib.util
-
-        spec = importlib.util.spec_from_file_location(
-            "gui", init, submodule_search_locations=[here]
-        )
-        if spec is None or spec.loader is None:
-            return
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["gui"] = module
-        spec.loader.exec_module(module)
-    except Exception:
-        print("keybackcon-gui: no se pudo cargar el paquete gui", file=sys.stderr)
-
-
 _fix_path()
-_ensure_gui_package()
 
+# Bootstrap único: ensure_package + api (gui/__init__.py).
 try:
-    from gui import load, log_exc, gettext_func
-except ImportError:  # último recurso: ejecutar gui/ como directorio suelto
-    def load(nombre):
-        import importlib
+    from gui import UNKNOWN_VERSION, api, app_version as _pkg_version
+except ImportError:
+    import importlib.util
 
-        return importlib.import_module(nombre)
+    _init = os.path.join(os.path.dirname(os.path.abspath(__file__)), "__init__.py")
+    _spec = importlib.util.spec_from_file_location(
+        "gui",
+        _init,
+        submodule_search_locations=[os.path.dirname(_init)],
+    )
+    if _spec is None or _spec.loader is None:
+        raise
+    _mod = importlib.util.module_from_spec(_spec)
+    sys.modules["gui"] = _mod
+    _spec.loader.exec_module(_mod)
+    from gui import UNKNOWN_VERSION, api, app_version as _pkg_version
 
-    def gettext_func():
-        return load("i18n")._
-
-    def log_exc(contexto):
-        print(f"keybackcon-gui: {contexto}: error de importación", file=sys.stderr)
+load, log_exc, gettext_func = api(__file__)
 
 
 def print_usage(out=None):
@@ -96,11 +71,9 @@ def print_usage(out=None):
 
 def _app_version():
     try:
-        from gui import __version__ as version
-
-        return version
+        return _pkg_version()
     except Exception:
-        return "2.2.1"
+        return UNKNOWN_VERSION
 
 
 def _setup_i18n():
