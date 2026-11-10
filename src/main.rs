@@ -43,3 +43,60 @@ fn main() {
 
 #[cfg(test)]
 pub(crate) static TEST_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Restaura variables de entorno al salir (también ante panic). KBC-33.
+#[cfg(test)]
+pub(crate) struct EnvGuard {
+    _lock: std::sync::MutexGuard<'static, ()>,
+    prev: Vec<(&'static str, Option<std::ffi::OsString>)>,
+}
+
+#[cfg(test)]
+impl EnvGuard {
+    pub(crate) fn lock() -> Self {
+        let guard = TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        Self {
+            _lock: guard,
+            prev: Vec::new(),
+        }
+    }
+
+    fn remember(&mut self, key: &'static str) {
+        if !self.prev.iter().any(|(k, _)| *k == key) {
+            self.prev.push((key, std::env::var_os(key)));
+        }
+    }
+
+    pub(crate) fn set(&mut self, key: &'static str, value: impl AsRef<std::ffi::OsStr>) {
+        self.remember(key);
+        // SAFETY: TEST_ENV_LOCK serializa mutaciones del entorno en tests.
+        unsafe {
+            std::env::set_var(key, value);
+        }
+    }
+
+    pub(crate) fn remove(&mut self, key: &'static str) {
+        self.remember(key);
+        // SAFETY: TEST_ENV_LOCK serializa mutaciones del entorno en tests.
+        unsafe {
+            std::env::remove_var(key);
+        }
+    }
+}
+
+#[cfg(test)]
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        // SAFETY: el mutex sigue tomado hasta el final de este drop.
+        unsafe {
+            for (key, val) in self.prev.drain(..).rev() {
+                match val {
+                    Some(v) => std::env::set_var(key, v),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+    }
+}
