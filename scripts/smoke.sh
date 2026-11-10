@@ -51,6 +51,21 @@ else
   bad "candado tmpfiles/sysusers"
 fi
 
+# Instalar ≠ autorizar (KBC-01/11): no invocar usermod (documentarlo en echo sí vale).
+if ! grep -E 'usermod[[:space:]]+-aG[[:space:]]+keybackcon' \
+      "${REPO_DIR}/scripts/install.sh" "${REPO_DIR}/packaging/debian/postinst" \
+    | grep -vE 'echo |# ' | grep -q .; then
+  ok "install/postinst sin usermod automático"
+else
+  bad "usermod automático (debe ser preparación explícita)"
+fi
+
+if grep -q 'Instalar no te mete en el grupo\|autorización de escritura pendiente' "${REPO_DIR}/scripts/install.sh"; then
+  ok "install.sh documenta habilitación explícita"
+else
+  bad "install.sh sin mensaje de habilitación explícita"
+fi
+
 if grep -q "ExecStart=/usr/bin/keybackcon restore" "${REPO_DIR}/packaging/systemd/keybackcon.service"; then
   ok "systemd service (/usr/bin)"
 else
