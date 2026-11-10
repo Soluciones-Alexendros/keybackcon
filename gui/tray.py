@@ -20,7 +20,10 @@ except ImportError:  # ejecución directa: gui/ en sys.path
               file=sys.stderr)
 
 _ = gettext_func()
-KeybackconError = load("client").KeybackconError
+_backend_mod = load("backend")
+BackendQueue = _backend_mod.BackendQueue
+Intent = _backend_mod.Intent
+RetryBook = _backend_mod.RetryBook
 _colors = load("colors")
 hex_to_rgb = _colors.hex_to_rgb
 hsv_to_rgb = _colors.hsv_to_rgb
@@ -151,7 +154,7 @@ def render_tray_icon(color_hex, mode):
 
 class TrayIndicator:
     def __init__(self, client, on_toggle_window, on_preferences=None,
-                 on_about=None, on_quit=None):
+                 on_about=None, on_quit=None, backend=None):
         self._client = client
         self._on_toggle_window = on_toggle_window
         self._on_preferences = on_preferences
@@ -163,13 +166,19 @@ class TrayIndicator:
         self._syncing_menu = False
         self._syncing_scale = False
         self._bright_source = None
+        if backend is None:
+            self._backend = BackendQueue(client)
+            self._owns_backend = True
+        else:
+            self._backend = backend
+            self._owns_backend = False
+        self._retries = RetryBook()
         try:
             color, pct = client.get_state_file()
             self._color = _normalize_hex(color)
             self._brightness = _clamp_brightness(pct)
         except Exception:
             log_exc("estado inicial de bandeja")
-        self._pending = []
         self._visible = True
         self._indicator = AyatanaAppIndicator3.Indicator.new(
             "keybackcon",
@@ -309,28 +318,58 @@ class TrayIndicator:
         finally:
             self._syncing_menu = False
 
-    # --- infraestructura: reintentos, icono, salida limpia ---------------
+    # --- infraestructura: cola async, reintentos, icono ------------------
 
-    def _safe(self, fn):
+    def _enqueue(self, kind, payload=None):
+        """Encola intención inmutable; consolida familia mode/brightness (KBC-09)."""
+        intent = self._retries.replace(kind, payload)
+        self._dispatch(intent)
+
+    def _dispatch(self, intent):
+        if not self._retries.begin(intent):
+            return
+
+        def on_done(ok, err):
+            def finish():
+                nxt, _superseded = self._retries.finish(intent, ok)
+                if nxt is not None:
+                    self._dispatch(nxt)
+                return False
+
+            try:
+                GLib.idle_add(finish)
+            except Exception:
+                finish()
+
         try:
-            fn()
-        except KeybackconError:
-            self._pending.append(fn)
+            if intent.kind == "set":
+                # stop + set: el callback solo en set (estado final deseado).
+                self._backend.submit(Intent("stop"))
+                self._backend.submit(
+                    Intent("set", intent.payload, on_done=on_done)
+                )
+            elif intent.kind == "brightness":
+                self._backend.submit(
+                    Intent("brightness", intent.payload, on_done=on_done)
+                )
+            elif intent.kind == "animation":
+                self._backend.submit(
+                    Intent("animation", intent.payload, on_done=on_done)
+                )
+            elif intent.kind == "off":
+                self._backend.submit(Intent("off", on_done=on_done))
+            elif intent.kind == "restore":
+                self._backend.submit(Intent("restore", on_done=on_done))
+            else:
+                self._retries.finish(intent, False)
+                log_exc("intención de bandeja desconocida")
         except Exception:
-            log_exc("acción de bandeja")
+            self._retries.finish(intent, False)
+            log_exc("encolar bandeja")
 
     def _reintentar_pendientes(self):
-        if not self._pending:
-            return
-        rest = []
-        for fn in self._pending:
-            try:
-                fn()
-            except KeybackconError:
-                rest.append(fn)
-            except Exception:
-                log_exc("reintento de bandeja")
-        self._pending = rest
+        for intent in self._retries.due():
+            self._dispatch(intent)
 
     def _tick(self):
         self._reintentar_pendientes()
@@ -466,35 +505,33 @@ class TrayIndicator:
     # --- acciones sobre el teclado -----------------------------------------
 
     def _do_color(self, hexv):
-        self._color = _normalize_hex(hexv)
+        color = _normalize_hex(hexv)
+        self._color = color
         self._mode = "fijar"
         self._sync_menus()
         self._render_icon()
-        self._safe(lambda: (self._client.stop(), self._client.set_color(self._color)))
+        self._enqueue("set", color)
 
     def _do_fijar(self, *args):
         self._do_color(self._color)
 
     def _do_animation(self, mode):
-        self._mode = _normalize_mode(mode)
-        if self._mode == "off":
-            self._mode = "fijar"
+        modo = _normalize_mode(mode)
+        if modo == "off":
+            modo = "fijar"
+        self._mode = modo
         self._sync_menus()
         self._render_icon()
-        self._safe(lambda: self._client.animation(self._mode))
+        self._enqueue("animation", modo)
 
     def _do_off(self, *args):
         self._mode = "off"
         self._sync_menus()
         self._render_icon()
-        self._safe(lambda: self._client.off())
+        self._enqueue("off")
 
     def _do_restore(self, *args):
-        def accion():
-            self._client.restore()
-            self._sync_desde_archivos()
-
-        self._safe(accion)
+        self._enqueue("restore")
 
     def _do_custom_tone(self, *args):
         dlg = None
@@ -529,7 +566,7 @@ class TrayIndicator:
                 log_exc("ajustar brillo")
             finally:
                 self._syncing_scale = False
-        self._safe(lambda: self._client.set_brightness(target))
+        self._enqueue("brightness", target)
 
     def _on_scroll(self, _indicator, steps, _orientation, *args):
         try:
@@ -566,6 +603,15 @@ class TrayIndicator:
     def quit(self):
         """Salida limpia: para la animación y devuelve el control a quien
         posee el bucle GTK (callback), nunca ``os._exit``."""
+        try:
+            self._retries.clear()
+        except Exception:
+            log_exc("limpiar reintentos")
+        if self._owns_backend:
+            try:
+                self._backend.close()
+            except Exception:
+                log_exc("cerrar backend de bandeja")
         try:
             self._client.stop()
         except Exception:
