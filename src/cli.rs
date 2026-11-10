@@ -396,6 +396,13 @@ fn brightness_delta(change: &BrightnessChange, current: u32) -> u32 {
     .clamp(0, 100)
 }
 
+/// Transición única a color fijo tras un ajuste de brillo sin animación (KBC-17).
+fn apply_fixed_brightness_transition(st: &mut state::PersistedState, new_brightness: u32) {
+    st.brightness = new_brightness;
+    st.power = "on".into();
+    st.mode = "fijar".into();
+}
+
 #[allow(clippy::needless_pass_by_value)]
 fn cmd_brightness(change: BrightnessChange) -> Result<(), Error> {
     // Barrera de test antes del candado de estado: ambos hijos se sincronizan
@@ -412,11 +419,10 @@ fn cmd_brightness(change: BrightnessChange) -> Result<(), Error> {
             saved = state::with_state_txn(|| {
                 let mut st = state::load_persisted()?;
                 let new = brightness_delta(&change, st.brightness);
-                st.brightness = new;
-                if st.power == "off" {
-                    st.power = "on".into();
-                    st.mode = "fijar".into();
-                }
+                // KBC-17: tras desactivar autónomos y escribir color fijo, el
+                // modo persistido debe ser `fijar`/`on` aunque power ya era on
+                // (p. ej. mode=firmware). Antes solo se actualizaba si power=off.
+                apply_fixed_brightness_transition(&mut st, new);
                 let mut l = Lamp::open()?;
                 l.autonomous(false)?;
                 l.color(color::scale(st.base_color, new))?;
@@ -780,6 +786,36 @@ mod tests {
             final_brightness, 70,
             "KBC-03: ambos exit 0 → brillo 70; códigos A={code_a:?} B={code_b:?}"
         );
+    }
+
+    /// KBC-17: firmware on + brillo → modo `fijar`/`on` aunque power ya era on.
+    #[test]
+    fn kbc17_brillo_tras_firmware_transiciona_a_fijar() {
+        let mut st = state::PersistedState {
+            power: "on".into(),
+            mode: "firmware".into(),
+            brightness: 50,
+            ..Default::default()
+        };
+        apply_fixed_brightness_transition(&mut st, 70);
+        assert_eq!(st.brightness, 70);
+        assert_eq!(st.power, "on");
+        assert_eq!(
+            st.mode, "fijar",
+            "KBC-17: no debe quedar mode=firmware tras escribir color fijo"
+        );
+
+        // También desde off (regresión del camino previo).
+        let mut off = state::PersistedState {
+            power: "off".into(),
+            mode: "firmware".into(),
+            brightness: 10,
+            ..Default::default()
+        };
+        apply_fixed_brightness_transition(&mut off, 40);
+        assert_eq!(off.power, "on");
+        assert_eq!(off.mode, "fijar");
+        assert_eq!(off.brightness, 40);
     }
 
     /// KBC-04: si falla al adquirir recursos, no se publica modo/on; off se conserva.
