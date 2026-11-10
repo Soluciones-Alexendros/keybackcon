@@ -277,6 +277,7 @@ class MesaWindow(Adw.ApplicationWindow):
         minus.connect("clicked", self._on_bright_step, -1)
         brow.append(minus)
         self._syncing_bright = False
+        self._syncing_mode = False
         self.bright_scale = Gtk.Scale.new_with_range(
             Gtk.Orientation.HORIZONTAL, 0, 100, 1
         )
@@ -678,6 +679,8 @@ class MesaWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def _on_mode(self, btn, key):
+        if self._syncing_mode:
+            return
         if not btn.get_active():
             return
         for k, b in self.seg_buttons.items():
@@ -693,14 +696,19 @@ class MesaWindow(Adw.ApplicationWindow):
             self._run_animation(key)
 
     def _on_stop(self, _btn):
+        # KBC-40: no disparar _on_mode al activar «fijar» por programa.
         try:
             self._client.stop_animation()
         except Exception:
             log_exc("parar animación")
         self.preview_mode = "fijar"
-        for b in self.seg_buttons.values():
-            b.set_active(False)
-        self.seg_buttons["fijar"].set_active(True)
+        self._syncing_mode = True
+        try:
+            for b in self.seg_buttons.values():
+                b.set_active(False)
+            self.seg_buttons["fijar"].set_active(True)
+        finally:
+            self._syncing_mode = False
         if self._run_stop(_("Light steady again")):
             self._run_set(self.cur_color)
 
