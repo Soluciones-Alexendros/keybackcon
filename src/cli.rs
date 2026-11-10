@@ -492,7 +492,6 @@ mod tests {
     use super::*;
     use std::fs;
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-    use std::os::unix::process::CommandExt;
     use std::path::{Path, PathBuf};
     use std::process::Stdio;
     use std::sync::MutexGuard;
@@ -626,17 +625,31 @@ mod tests {
         state::save_persisted(&st).unwrap();
         assert_eq!(state::load_persisted().unwrap().brightness, 50);
 
-        let mut anim = std::process::Command::new("sleep")
-            .arg0("keybackcon")
+        // Identidad estricta (KBC-06): basename exacto de exe/argv0, no subcadena.
+        let fixtures = runtime.join("fixtures");
+        fs::create_dir_all(&fixtures).unwrap();
+        let anim_bin = fixtures.join("keybackcon");
+        let _ = fs::remove_file(&anim_bin);
+        let sleep = if Path::new("/bin/sleep").exists() {
+            Path::new("/bin/sleep")
+        } else {
+            Path::new("/usr/bin/sleep")
+        };
+        if fs::hard_link(sleep, &anim_bin).is_err() {
+            fs::copy(sleep, &anim_bin).expect("copiar sleep como fixture keybackcon");
+        }
+        let mut anim = std::process::Command::new(&anim_bin)
             .arg("8")
             .spawn()
             .expect("animación falsa");
         let anim_pid = anim.id().cast_signed();
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            let cmd =
-                fs::read_to_string(format!("/proc/{}/cmdline", anim.id())).unwrap_or_default();
-            if cmd.contains("keybackcon") {
+            let exe_ok = fs::read_link(format!("/proc/{anim_pid}/exe"))
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n == "keybackcon"))
+                .unwrap_or(false);
+            if exe_ok {
                 break;
             }
             assert!(Instant::now() < deadline, "animación falsa no arrancó");
