@@ -53,13 +53,16 @@ firmware declara `IntensityLevelCount=1`, no hay canal de brillo), `hsv`,
 Formato canónico (`SCHEMA_VERSION = 1`) en
 `$XDG_STATE_HOME/keybackcon/state` (claves `schema_version`, `base_color`,
 `brightness`, `power`, `mode`, `restore_policy`). Lectura heredada del
-plano `"<hex> <pct>"` y de `kbd-rgb/state`. Las actualizaciones RMW
-(brillo, modo) toman un `flock` breve sobre `state.lock` (no se mantiene
-durante el bucle de animación). El id de ejecución vive en
-`$XDG_RUNTIME_DIR/keybackcon/animation.run` para que una limpieza obsoleta
-no pise un `off` nuevo. `load_state` / `save_state` / `apply` /
-`set_runtime_mode` / `begin_animation_mode` / `end_animation_mode` son la
-API; el contrato de sesión está en
+plano `"<hex> <pct>"` y de `kbd-rgb/state`. `parse_state_text` /
+`load_persisted` distinguen ausencia (defaults), corrupción y esquema
+futuro (error; el original se conserva). `save_persisted` usa temporal
+exclusivo `0600` + `rename`. La GUI reutiliza el mismo oráculo en
+`gui/client.py`. Las actualizaciones RMW (brillo, modo) toman un `flock`
+breve sobre `state.lock` (no se mantiene durante el bucle de animación).
+El id de ejecución vive en `$XDG_RUNTIME_DIR/keybackcon/animation.run`
+para que una limpieza obsoleta no pise un `off` nuevo. `load_state` /
+`save_state` / `apply` / `set_runtime_mode` / `begin_animation_mode` /
+`end_animation_mode` son la API; el contrato de sesión está en
 [`docs/product/contrato.md`](docs/product/contrato.md).
 
 ### `animation.rs` — animación exclusiva y parada limpia
@@ -89,12 +92,10 @@ parser manual sin dependencias: `parse(&[String])` valida y `run()` despacha
 a `cmd_info/cmd_set/cmd_off/cmd_brightness/cmd_firmware_effects/
 cmd_animation/cmd_stop/cmd_restore`; `usage()` conserva texto y `exit 2`.
 Comandos `info [--json]/set/off/brightness|bright/firmware-effects|auto/
-animation|anim/stop/restore`, `--help/--version`. `info` consulta el HID
-antes que el estado XDG: un fallo de preferencias no oculta el dispositivo
-(informe parcial con `preference_error` en JSON). `info --json` imprime una
-línea `{"version","device","lamps","kind","state","brightness",…}` estable
-para la GUI (el formato humano no es API). El parser rechaza argumentos
-extra y `--fps` no numérico. Todo lo que cambia el color detiene primero la
+animation|anim/stop/restore`, `--help/--version`. `info --json` imprime una
+línea `{"version","device","lamps","kind","state","brightness"}` estable para
+la GUI (el formato humano no es API). El parser rechaza argumentos extra y
+`--fps` no numérico. Todo lo que cambia el color detiene primero la
 animación: una sola escritora, nunca "teclado loco".
 
 ### `error.rs` — errores del CLI
