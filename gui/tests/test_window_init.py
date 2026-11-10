@@ -39,8 +39,18 @@ class FakeClient:
         return None
 
 
+# El job quality exige la suite gráfica con KEYBACKCON_REQUIRE_GUI_SUITE=1.
+# Smoke y otros entornos con CI=true no la fuerzan (sin GTK/xvfb).
+_GUI_SUITE = os.environ.get("KEYBACKCON_GUI_TESTS") == "1"
+if os.environ.get("KEYBACKCON_REQUIRE_GUI_SUITE") == "1" and not _GUI_SUITE:
+    raise RuntimeError(
+        "suite gráfica obligatoria: define KEYBACKCON_GUI_TESTS=1 "
+        "(junto a KEYBACKCON_REQUIRE_GUI_SUITE=1)"
+    )
+
+
 @unittest.skipUnless(
-    os.environ.get("KEYBACKCON_GUI_TESTS") == "1",
+    _GUI_SUITE,
     "requiere GTK/Adw en display (KEYBACKCON_GUI_TESTS=1)",
 )
 class TestWindowInitSinEscrituras(unittest.TestCase):
@@ -53,9 +63,9 @@ class TestWindowInitSinEscrituras(unittest.TestCase):
 
         from gui.preflight import check_gui_requirements
 
-        ok, _msg = check_gui_requirements()
+        ok, msg = check_gui_requirements()
         if not ok:
-            self.skipTest("libadwaita insuficiente para la ventana")
+            self.fail(f"KEYBACKCON_GUI_TESTS=1 pero GUI no usable: {msg}")
 
         from gui.window import MesaWindow
 
