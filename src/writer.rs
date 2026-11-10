@@ -274,7 +274,10 @@ fn diagnose_open_failure(path: &Path, e: io::Error, relaxed: bool) -> io::Error 
         );
     }
     if relaxed {
-        return denied(format!("no se pudo abrir el candado {}: {e}", path.display()));
+        return denied(format!(
+            "no se pudo abrir el candado {}: {e}",
+            path.display()
+        ));
     }
     denied(format_open_denied(
         path,
@@ -478,7 +481,10 @@ mod tests {
         let msg = format_open_denied(path, LockAccessHint::NotAuthorized, &os);
         assert!(msg.contains("Instalar no autoriza"), "{msg}");
         assert!(msg.contains("usermod -aG keybackcon"), "{msg}");
-        assert!(msg.contains("sesión nueva") || msg.contains("newgrp"), "{msg}");
+        assert!(
+            msg.contains("sesión nueva") || msg.contains("newgrp"),
+            "{msg}"
+        );
 
         let missing = format_open_denied(path, LockAccessHint::GroupMissing, &os);
         assert!(missing.contains("grupo keybackcon no existe"), "{missing}");
@@ -490,10 +496,7 @@ mod tests {
 
     #[test]
     fn pista_grupo_ausente_sin_getgrnam() {
-        let hint = lock_access_hint(Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "sin grupo",
-        )));
+        let hint = lock_access_hint(Err(io::Error::new(io::ErrorKind::NotFound, "sin grupo")));
         assert_eq!(hint, LockAccessHint::GroupMissing);
     }
 
