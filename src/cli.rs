@@ -340,37 +340,77 @@ fn cmd_off() -> Result<(), Error> {
     })
 }
 
+fn brightness_delta(change: &BrightnessChange, current: u32) -> u32 {
+    match change {
+        BrightnessChange::Set(n) => *n,
+        BrightnessChange::Up(n) => current.saturating_add(*n),
+        BrightnessChange::Down(n) => current.saturating_sub(*n),
+    }
+    .clamp(0, 100)
+}
+
 #[allow(clippy::needless_pass_by_value)]
 fn cmd_brightness(change: BrightnessChange) -> Result<(), Error> {
-    let mut st = state::load_persisted()?;
-    let new = match change {
-        BrightnessChange::Set(n) => n,
-        BrightnessChange::Up(n) => st.brightness.saturating_add(n),
-        BrightnessChange::Down(n) => st.brightness.saturating_sub(n),
-    }
-    .clamp(0, 100);
-    st.brightness = new;
+    // Barrera de test antes del candado de estado: ambos hijos se sincronizan
+    // y luego serializan el RMW (KBC-03). Producción no compila este bloque.
+    #[cfg(test)]
+    wait_brightness_test_barrier();
     // No detiene la animación: relee el porcentaje (ADR 4).
-    // Si no hay animación, reaplica el color fijo bajo el candado.
-    if animation::animation_pid_alive().is_none() {
+    // Sin animación: candado HID y, dentro, transacción breve de estado
+    // (orden HID → estado). Con animación: solo el candado de estado.
+    let new = if animation::animation_pid_alive().is_none() {
         require_writer_clear()?;
-        let base = st.base_color;
+        let mut saved = 0u32;
         with_hid_write(|| {
-            let mut l = Lamp::open()?;
-            l.autonomous(false)?;
-            l.color(color::scale(base, new))?;
-            if st.power == "off" {
-                st.power = "on".into();
-                st.mode = "fijar".into();
-            }
-            state::save_persisted(&st)?;
+            saved = state::with_state_txn(|| {
+                let mut st = state::load_persisted()?;
+                let new = brightness_delta(&change, st.brightness);
+                st.brightness = new;
+                if st.power == "off" {
+                    st.power = "on".into();
+                    st.mode = "fijar".into();
+                }
+                let mut l = Lamp::open()?;
+                l.autonomous(false)?;
+                l.color(color::scale(st.base_color, new))?;
+                state::save_persisted(&st)?;
+                Ok(new)
+            })?;
             Ok(())
         })?;
+        saved
     } else {
-        state::save_persisted(&st)?;
-    }
+        state::update_brightness(|cur| brightness_delta(&change, cur), false)?.1
+    };
     println!("brillo: %{new}");
     Ok(())
+}
+
+/// Espera el fichero «go» de `KEYBACKCON_TEST_BRIGHTNESS_BARRIER` tras anunciar listo.
+/// Solo existe bajo `cfg(test)`; producción no la compila.
+#[cfg(test)]
+fn wait_brightness_test_barrier() {
+    use std::path::PathBuf;
+    use std::time::{Duration, Instant};
+
+    let Ok(go) = std::env::var("KEYBACKCON_TEST_BRIGHTNESS_BARRIER") else {
+        return;
+    };
+    let go = PathBuf::from(go);
+    let Some(dir) = go.parent() else {
+        return;
+    };
+    let ready = dir.join(format!("ready-{}", std::process::id()));
+    let _ = std::fs::write(&ready, b"ready\n");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !go.exists() {
+        assert!(
+            Instant::now() < deadline,
+            "timeout esperando barrera de brillo en {}",
+            go.display()
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
 }
 
 fn cmd_firmware_effects(on: bool) -> Result<(), Error> {
@@ -385,11 +425,9 @@ fn cmd_firmware_effects(on: bool) -> Result<(), Error> {
 
 #[allow(clippy::needless_pass_by_value)]
 fn cmd_animation(mode: Mode, fps: u64) -> Result<(), Error> {
-    let name = mode.as_str();
-    state::set_runtime_mode(name, "on")?;
-    let result = animation::run_animation(name, fps);
-    let _ = state::set_runtime_mode("fijar", "on");
-    result.map_err(Error::from)
+    // KBC-04/05: run_animation publica el modo tras adquirir recursos y hace
+    // el guardado final antes de liberar AnimationLock.
+    animation::run_animation(mode.as_str(), fps).map_err(Error::from)
 }
 
 fn cmd_stop() -> Result<(), Error> {
@@ -452,9 +490,241 @@ fn cmd_restore(on_login: bool) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    use std::os::unix::process::CommandExt;
+    use std::path::{Path, PathBuf};
+    use std::process::Stdio;
+    use std::sync::MutexGuard;
+    use std::time::{Duration, Instant};
 
     fn args(v: &[&str]) -> Vec<String> {
         v.iter().map(ToString::to_string).collect()
+    }
+
+    struct BrightnessEnv {
+        _lock: MutexGuard<'static, ()>,
+        prev_state: Option<std::ffi::OsString>,
+        prev_runtime: Option<std::ffi::OsString>,
+        prev_writer: Option<std::ffi::OsString>,
+    }
+
+    impl Drop for BrightnessEnv {
+        fn drop(&mut self) {
+            // SAFETY: TEST_ENV_LOCK sigue tomado; restauramos el entorno.
+            unsafe {
+                match self.prev_state.take() {
+                    Some(v) => std::env::set_var("XDG_STATE_HOME", v),
+                    None => std::env::remove_var("XDG_STATE_HOME"),
+                }
+                match self.prev_runtime.take() {
+                    Some(v) => std::env::set_var("XDG_RUNTIME_DIR", v),
+                    None => std::env::remove_var("XDG_RUNTIME_DIR"),
+                }
+                match self.prev_writer.take() {
+                    Some(v) => std::env::set_var("KEYBACKCON_WRITER_LOCK", v),
+                    None => std::env::remove_var("KEYBACKCON_WRITER_LOCK"),
+                }
+            }
+        }
+    }
+
+    fn tmp_brightness_env(tag: &str) -> (PathBuf, PathBuf, BrightnessEnv) {
+        let guard = crate::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let root = PathBuf::from(format!(
+            "/tmp/keybackcon-brightness-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let state = root.join("state");
+        let runtime = root.join("runtime");
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(state.join("keybackcon"))
+            .unwrap();
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(runtime.join("keybackcon"))
+            .unwrap();
+        let writer = runtime.join("writer.lock");
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .mode(0o660)
+            .open(&writer)
+            .unwrap();
+        let prev_state = std::env::var_os("XDG_STATE_HOME");
+        let prev_runtime = std::env::var_os("XDG_RUNTIME_DIR");
+        let prev_writer = std::env::var_os("KEYBACKCON_WRITER_LOCK");
+        // SAFETY: TEST_ENV_LOCK serializa el entorno de tests.
+        unsafe {
+            std::env::set_var("XDG_STATE_HOME", &state);
+            std::env::set_var("XDG_RUNTIME_DIR", &runtime);
+            std::env::set_var("KEYBACKCON_WRITER_LOCK", &writer);
+        }
+        (
+            root,
+            state,
+            BrightnessEnv {
+                _lock: guard,
+                prev_state,
+                prev_runtime,
+                prev_writer,
+            },
+        )
+    }
+
+    /// Hijo del patrón `writer.rs`: `--exact` + env. Solo actúa con la marca.
+    #[test]
+    fn brightness_hijo_concurrencia() {
+        if std::env::var_os("KEYBACKCON_BRIGHTNESS_CHILD").is_none() {
+            return;
+        }
+        match cmd_brightness(BrightnessChange::Up(10)) {
+            Ok(()) => std::process::exit(0),
+            Err(e) => {
+                eprintln!("brightness hijo: {e}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    fn spawn_brightness_hijo(state: &Path, runtime: &Path, go: &Path) -> std::process::Child {
+        std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "cli::tests::brightness_hijo_concurrencia"])
+            .env("KEYBACKCON_BRIGHTNESS_CHILD", "1")
+            .env("KEYBACKCON_TEST_BRIGHTNESS_BARRIER", go)
+            .env("XDG_STATE_HOME", state)
+            .env("XDG_RUNTIME_DIR", runtime)
+            .env_remove("RUST_TEST_THREADS")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("hijo de brillo")
+    }
+
+    /// KBC-03: dos `+10` concurrentes desde 50 con animación viva → 70.
+    #[test]
+    fn kbc03_dos_up_concurrentes_serializan_a_70() {
+        let (root, state_home, _env) = tmp_brightness_env("kbc03");
+        let runtime = root.join("runtime");
+        let barrier_dir = root.join("barrier");
+        fs::create_dir_all(&barrier_dir).unwrap();
+        let go = barrier_dir.join("go");
+
+        let st = state::PersistedState {
+            brightness: 50,
+            mode: "breathe".into(),
+            ..Default::default()
+        };
+        state::save_persisted(&st).unwrap();
+        assert_eq!(state::load_persisted().unwrap().brightness, 50);
+
+        let mut anim = std::process::Command::new("sleep")
+            .arg0("keybackcon")
+            .arg("8")
+            .spawn()
+            .expect("animación falsa");
+        let anim_pid = anim.id().cast_signed();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let cmd =
+                fs::read_to_string(format!("/proc/{}/cmdline", anim.id())).unwrap_or_default();
+            if cmd.contains("keybackcon") {
+                break;
+            }
+            assert!(Instant::now() < deadline, "animación falsa no arrancó");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        fs::write(
+            runtime.join("keybackcon/animation.pid"),
+            anim_pid.to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            animation::animation_pid_alive(),
+            Some(anim_pid),
+            "hace falta animación reconocida viva para el camino sin HID"
+        );
+
+        let a = spawn_brightness_hijo(&state_home, &runtime, &go);
+        let b = spawn_brightness_hijo(&state_home, &runtime, &go);
+        let ready_deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let ready: Vec<_> = fs::read_dir(&barrier_dir)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|e| e.file_name().to_string_lossy().starts_with("ready-"))
+                .collect();
+            if ready.len() >= 2 {
+                break;
+            }
+            assert!(
+                Instant::now() < ready_deadline,
+                "timeout esperando listos de ambos hijos"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        fs::write(&go, b"go\n").unwrap();
+
+        let out_a = a.wait_with_output().expect("wait A");
+        let out_b = b.wait_with_output().expect("wait B");
+        let code_a = out_a.status.code();
+        let code_b = out_b.status.code();
+        let final_brightness = state::load_persisted().unwrap().brightness;
+
+        let _ = anim.kill();
+        let _ = anim.wait();
+        let _ = fs::remove_dir_all(&root);
+
+        assert_eq!(
+            code_a,
+            Some(0),
+            "hijo A\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&out_a.stdout),
+            String::from_utf8_lossy(&out_a.stderr)
+        );
+        assert_eq!(
+            code_b,
+            Some(0),
+            "hijo B\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&out_b.stdout),
+            String::from_utf8_lossy(&out_b.stderr)
+        );
+        assert_eq!(
+            final_brightness, 70,
+            "KBC-03: ambos exit 0 → brillo 70; códigos A={code_a:?} B={code_b:?}"
+        );
+    }
+
+    /// KBC-04: si falla al adquirir recursos, no se publica modo/on; off se conserva.
+    #[test]
+    fn kbc04_fallo_de_arranque_conserva_off() {
+        let (root, _state_home, _env) = tmp_brightness_env("kbc04");
+        let st = state::PersistedState {
+            power: "off".into(),
+            mode: "fijar".into(),
+            brightness: 40,
+            ..Default::default()
+        };
+        state::save_persisted(&st).unwrap();
+
+        // Ocupa el candado HID para que AnimationLock::claim falle sin abrir HID.
+        let _busy = crate::writer::WriterGuard::acquire().expect("candado de prueba");
+        let err = animation::run_animation("breathe", 30).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::AlreadyExists, "{err}");
+
+        let after = state::load_persisted().unwrap();
+        assert_eq!(after.power, "off");
+        assert_eq!(after.mode, "fijar");
+        assert_eq!(after.brightness, 40);
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
