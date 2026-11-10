@@ -25,7 +25,7 @@
 | `animation` | Un solo escritor; reclama exclusión antes de abrir el HID. | Modo de animación activo. |
 | `firmware-effects` | Activa o desactiva autónomos del firmware. | Publica el modo correspondiente. |
 | `restore` | Reaplica preferencia solo si la política de restauración está activa. | No reescribe la preferencia. |
-| `info` / `info --json` | Consulta de solo lectura. | Los campos de color/brillo son **preferencia persistida**, no medición física. |
+| `info` / `info --json` | Consulta de solo lectura; **primero** dispositivo/atributos HID y **después** preferencias. Si el estado XDG es ilegible, el informe sigue mostrando el hardware y marca la preferencia como no disponible (`preference_error` / texto humano). | Los campos de color/brillo son **preferencia persistida**, no medición física; pueden ausentarse en fallo parcial. |
 
 ## Interfaz
 

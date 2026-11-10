@@ -1,0 +1,9 @@
+# Oráculo compartido Rust/Python (KBC-16).
+# kind file [color brightness | version]
+ok valid_v1.state ff7800 60
+ok legacy_plain.state ff0000 60
+ok legacy_clamp.state 00ffff 0
+corrupt corrupt_trunc.state
+corrupt corrupt_garbage.state
+corrupt empty.state
+unsupported future_v99.state 99
