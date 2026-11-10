@@ -87,28 +87,7 @@ class TestPreflight(unittest.TestCase):
         self.assertTrue(msg)
 
 
-class TestBackendQueue(unittest.TestCase):
-    def test_consolida_brillo(self):
-        import time
-        from gui.backend import BackendQueue, Intent
-
-        class C:
-            def __init__(self):
-                self.vals = []
-
-            def set_brightness(self, v):
-                self.vals.append(v)
-
-        c = C()
-        q = BackendQueue(c)
-        done = []
-        q.submit(Intent("brightness", 10, lambda ok, e: done.append(1)))
-        q.submit(Intent("brightness", 20, lambda ok, e: done.append(2)))
-        q.submit(Intent("brightness", 30, lambda ok, e: done.append(3)))
-        time.sleep(0.3)
-        q.close()
-        time.sleep(0.1)
-        self.assertEqual(c.vals[-1:], [30])
+# Consolidación BackendQueue: gui.tests.test_backend_async (KBC-32, sin sleeps).
 
 
 if __name__ == "__main__":
