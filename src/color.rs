@@ -42,32 +42,48 @@ impl std::fmt::Display for ColorError {
 
 impl std::error::Error for ColorError {}
 
+/// `true` si `b` es un dígito hex ASCII (`0-9` / `a-f`). Tras `to_lowercase`
+/// basta con minúsculas; rechaza `+`, signos y cualquier no-ASCII.
+fn is_ascii_hex_digit(b: u8) -> bool {
+    matches!(b, b'0'..=b'9' | b'a'..=b'f')
+}
+
 /// Interpreta `s` como predefinido (sin distinguir mayúsculas ni espacios
-/// exteriores) o como hex de 6 dígitos con `#` opcional.
+/// exteriores) o como hex de exactamente 6 dígitos ASCII con `#` opcional.
+///
+/// CLI-04: no se usa `from_str_radix` a ciegas — esa API admite `+` inicial
+/// (`+fffff` tiene longitud 6 y parsearía). Se exige hex ASCII estricto.
+/// Se conserva `#red` (y el resto de predefinidos con `#`).
 pub fn parse_color(s: &str) -> Result<Rgb, ColorError> {
     let t = s.trim().to_lowercase();
     let t = t.strip_prefix('#').unwrap_or(t.as_str());
     if let Some(&(_, c)) = PRESETS.iter().find(|(n, _)| *n == t) {
         return Ok(c);
     }
-    if t.len() == 6 {
-        if let Ok(v) = u32::from_str_radix(t, 16) {
-            return Ok((
-                ((v >> 16) & 0xFF) as u8,
-                ((v >> 8) & 0xFF) as u8,
-                (v & 0xFF) as u8,
-            ));
-        }
+    if t.len() == 6 && t.bytes().all(is_ascii_hex_digit) {
+        // SAFETY lógica: seis hexdigits ASCII → `from_str_radix` no falla.
+        let v = u32::from_str_radix(t, 16).map_err(|_| ColorError {
+            input: s.to_string(),
+        })?;
+        return Ok((
+            ((v >> 16) & 0xFF) as u8,
+            ((v >> 8) & 0xFF) as u8,
+            (v & 0xFF) as u8,
+        ));
     }
     Err(ColorError {
         input: s.to_string(),
     })
 }
 
-/// Escala cada canal por `pct` (0–100) con redondeo `(v*pct+50)/100`, sin
-/// superar 255.
+/// Escala cada canal por `pct` (0–100) con redondeo `(v*pct+50)/100`.
+///
+/// TEST-02: `pct` se satura a 100 antes de multiplicar, así `u32::MAX` y
+/// valores >100 no desbordan en debug ni envuelven en release.
 pub fn scale((r, g, b): Rgb, pct: u32) -> Rgb {
-    let f = |v: u8| ((u32::from(v) * pct + 50) / 100).min(255) as u8;
+    let pct = pct.min(100);
+    // Con pct≤100 el cociente cabe en u8 (máx. 255).
+    let f = |v: u8| u8::try_from((u32::from(v) * pct + 50) / 100).unwrap_or(255);
     (f(r), f(g), f(b))
 }
 
@@ -137,20 +153,58 @@ mod tests {
         assert!(parse_color("").is_err());
     }
 
+    /// CLI-04: `from_str_radix` admitiría `+fffff`; el contrato exige 6 hex ASCII.
     #[test]
-    fn scale_redondea_y_limita() {
+    fn parse_rechaza_signo_y_no_ascii_hex() {
+        for bad in [
+            "+fffff",
+            "#+fffff",
+            "+FF640",
+            "-fffff",
+            "gggggg",
+            "ff640",
+            "ff64000",
+            "ff 640",
+            "ＦＦＦＦＦＦ",
+            "١٢٣٤٥٦",
+        ] {
+            assert!(parse_color(bad).is_err(), "debió rechazarse {bad:?}");
+        }
+    }
+
+    #[test]
+    fn scale_redondea_y_satura_pct() {
         assert_eq!(scale((255, 255, 255), 100), (255, 255, 255));
         assert_eq!(scale((255, 120, 0), 50), (128, 60, 0));
         assert_eq!(scale((255, 255, 255), 0), (0, 0, 0));
         assert_eq!(scale((1, 1, 1), 50), (1, 1, 1));
+        // TEST-02: pct fuera de 0–100 se satura a 100 (no overflow).
+        assert_eq!(scale((255, 120, 0), 101), (255, 120, 0));
+        assert_eq!(scale((255, 120, 0), u32::MAX), (255, 120, 0));
+        assert_eq!(scale((10, 20, 30), 1_000_000), (10, 20, 30));
     }
 
     #[test]
-    fn hsv_primarios() {
+    fn hsv_primarios_gris_negro_y_sectores() {
         assert_eq!(hsv(0.0, 1.0, 1.0), (255, 0, 0));
         assert_eq!(hsv(120.0, 1.0, 1.0), (0, 255, 0));
         assert_eq!(hsv(240.0, 1.0, 1.0), (0, 0, 255));
         assert_eq!(hsv(0.0, 0.0, 1.0), (255, 255, 255));
+        // TEST-01: vectores independientes (no tautología u8→u16).
+        assert_eq!(hsv(0.0, 0.0, 0.0), (0, 0, 0));
+        assert_eq!(hsv(180.0, 0.0, 0.5), (128, 128, 128));
+        // Canal fijo a 0 en cada sector (límites inclusive).
+        assert_eq!(hsv(0.0, 1.0, 1.0).2, 0);
+        assert_eq!(hsv(59.0, 1.0, 1.0).2, 0);
+        assert_eq!(hsv(60.0, 1.0, 1.0).2, 0);
+        assert_eq!(hsv(120.0, 1.0, 1.0).0, 0);
+        assert_eq!(hsv(179.0, 1.0, 1.0).0, 0);
+        assert_eq!(hsv(180.0, 1.0, 1.0).0, 0);
+        assert_eq!(hsv(240.0, 1.0, 1.0).1, 0);
+        assert_eq!(hsv(300.0, 1.0, 1.0).1, 0);
+        let mut broken_like = hsv(0.0, 1.0, 1.0);
+        broken_like.0 = broken_like.0.wrapping_add(1);
+        assert_ne!(broken_like, (255, 0, 0));
     }
 
     #[test]
@@ -173,10 +227,13 @@ mod tests {
             let (p1, p2) = (a.min(b), a.max(b));
             for pct in [0, 100, p1, p2] {
                 let s = scale(c, pct);
-                assert!(u16::from(s.0) <= 255 && u16::from(s.1) <= 255 && u16::from(s.2) <= 255);
+                // Oráculo de la fórmula (sustituye la tautología u8≤255).
+                let expect = |v: u8| u8::try_from((u32::from(v) * pct + 50) / 100).unwrap_or(255);
+                assert_eq!(s, (expect(c.0), expect(c.1), expect(c.2)));
             }
             assert_eq!(scale(c, 0), (0, 0, 0));
             assert_eq!(scale(c, 100), c);
+            assert_eq!(scale(c, 250), c); // saturación a 100
             let (s1, s2) = (scale(c, p1), scale(c, p2));
             assert!(s1.0 <= s2.0 && s1.1 <= s2.1 && s1.2 <= s2.2);
         }
@@ -191,12 +248,22 @@ mod tests {
             let v = f64::from(rng.next_below(1001)) / 1000.0;
             assert!(h < 360.0 && s <= 1.0 && v <= 1.0);
             let c = hsv(h, s, v);
-            assert!(u16::from(c.0) <= 255 && u16::from(c.1) <= 255 && u16::from(c.2) <= 255);
-            if v >= 1.0 {
+            if v == 0.0 {
+                assert_eq!(c, (0, 0, 0));
+            }
+            if s == 0.0 {
+                assert_eq!(c.0, c.1);
+                assert_eq!(c.1, c.2);
+            }
+            if v >= 1.0 && s > 0.0 {
                 assert!(c.0 == 255 || c.1 == 255 || c.2 == 255);
             }
             let full = hsv(h, s, 1.0);
-            assert!(full.0 == 255 || full.1 == 255 || full.2 == 255);
+            if s > 0.0 {
+                assert!(full.0 == 255 || full.1 == 255 || full.2 == 255);
+            } else {
+                assert_eq!(full, (255, 255, 255));
+            }
         }
     }
 }
