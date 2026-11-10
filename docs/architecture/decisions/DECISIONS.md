@@ -140,13 +140,18 @@ sin crates nuevos (ADR 2): `flock` y `open` son libc.
 
 El candado es `/run/keybackcon/writer.lock`. `tmpfiles.d` crea el directorio
 `root:keybackcon` modo `0770` y el fichero `root:keybackcon` modo `0660`.
-El grupo `keybackcon` lo declara `sysusers.d` del paquete. La regla udev
-actual no nombra un grupo: solo aplica `TAG+="uaccess"` al `hidraw`. Esa
-regla no cambia a `MODE="0666"` ni a un grupo que abra el dispositivo por
-sí solo. Para escribir hacen falta las dos cosas: abrir el `hidraw` (ACL de
-la sesión) y abrir el candado (miembro del grupo). Si el directorio no
-existe, es un enlace, no pertenece a root o el modo no es el esperado, la
-escritura se rechaza. No hay fallback a `/var/tmp` ni a un fichero `0666`.
+Esos modos están acoplados a `validate_installed_parent` / `open` en
+`src/writer.rs`: cambiar uno sin el otro rompe el escritor. El grupo
+`keybackcon` lo declara `sysusers.d` del paquete. **Instalar ≠ autorizar:**
+el postinst y `install.sh` crean grupo y candado, pero no añaden usuarios
+al grupo; la habilitación es explícita (`sudo usermod -aG keybackcon $USER`
+y una sesión nueva). La regla udev actual no nombra un grupo: solo aplica
+`TAG+="uaccess"` al `hidraw`. Esa regla no cambia a `MODE="0666"` ni a un
+grupo que abra el dispositivo por sí solo. Para escribir hacen falta las
+dos cosas: abrir el `hidraw` (ACL de la sesión) y abrir el candado
+(miembro del grupo). Si el directorio no existe, es un enlace, no pertenece
+a root o el modo no es el esperado, la escritura se rechaza. No hay
+fallback a `/var/tmp` ni a un fichero `0666`.
 
 El bloqueo es cooperativo: solo excluye a los procesos del producto que lo
 toman. Dos usuarios que puedan abrir el candado se serializan; el segundo

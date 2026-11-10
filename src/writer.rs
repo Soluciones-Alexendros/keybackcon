@@ -10,11 +10,14 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
-// SAFETY: flock y getgrnam son libc con ABI estable.
+// SAFETY: flock/getgrnam/getgroups son libc con ABI estable.
 unsafe extern "C" {
     fn flock(fd: i32, op: i32) -> i32;
     // c_char: en aarch64 es u8; un *const i8 no compila.
     fn getgrnam(name: *const c_char) -> *mut Group;
+    fn getegid() -> u32;
+    fn getgid() -> u32;
+    fn getgroups(size: i32, list: *mut u32) -> i32;
 }
 
 const LOCK_EX: i32 = 2;
@@ -110,11 +113,17 @@ fn test_lock_override() -> Option<PathBuf> {
 }
 
 /// El directorio instalado por `tmpfiles.d`: `root:keybackcon` y modo `0770`.
+///
+/// Contrato acoplado al fichero `0660` (KBC-01/KBC-02): no cambiar un modo
+/// sin el otro ni sin actualizar esta validación y sus pruebas.
 pub fn validate_installed_parent(parent: &Path) -> io::Result<()> {
     let meta = fs::symlink_metadata(parent).map_err(|e| {
         io::Error::new(
             io::ErrorKind::NotFound,
-            format!("no hay directorio de candado {}: {e}", parent.display()),
+            format!(
+                "no hay directorio de candado {}: {e}. Reinstala el paquete (tmpfiles.d/sysusers.d)",
+                parent.display()
+            ),
         )
     })?;
     if meta.file_type().is_symlink() {
@@ -130,7 +139,10 @@ pub fn validate_installed_parent(parent: &Path) -> io::Result<()> {
         return Err(denied(format!("{} no pertenece a root", parent.display())));
     }
     if meta.mode() & 0o777 != 0o770 {
-        return Err(denied(format!("{} debe ser modo 0770", parent.display())));
+        return Err(denied(format!(
+            "{} debe ser modo 0770 (contrato tmpfiles + escritor)",
+            parent.display()
+        )));
     }
     let gid = keybackcon_gid()?;
     if meta.gid() != gid {
@@ -178,16 +190,7 @@ fn open_writer_file(path: &Path, relaxed: bool) -> io::Result<File> {
         .write(true)
         .custom_flags(O_NOFOLLOW)
         .open(path)
-        .map_err(|e| {
-            io::Error::new(
-                if e.kind() == io::ErrorKind::NotFound {
-                    io::ErrorKind::NotFound
-                } else {
-                    io::ErrorKind::PermissionDenied
-                },
-                format!("no se pudo abrir el candado {}: {e}", path.display()),
-            )
-        })?;
+        .map_err(|e| diagnose_open_failure(path, e, relaxed))?;
     let meta = file.metadata()?;
     if !meta.is_file() {
         return Err(denied(format!(
@@ -207,7 +210,7 @@ fn open_writer_file(path: &Path, relaxed: bool) -> io::Result<File> {
     }
     if meta.uid() != 0 || mode != 0o660 {
         return Err(denied(format!(
-            "{} debe ser root y modo 0660",
+            "{} debe ser root:keybackcon modo 0660 (contrato tmpfiles + escritor)",
             path.display()
         )));
     }
@@ -218,6 +221,66 @@ fn open_writer_file(path: &Path, relaxed: bool) -> io::Result<File> {
         )));
     }
     Ok(file)
+}
+
+/// Pista unificada cuando `open` del candado falla (instalar ≠ autorizar).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LockAccessHint {
+    GroupMissing,
+    NotAuthorized,
+    StillDenied,
+}
+
+fn lock_access_hint(gid: io::Result<u32>) -> LockAccessHint {
+    match gid {
+        Err(_) => LockAccessHint::GroupMissing,
+        Ok(g) if user_has_gid(g) => LockAccessHint::StillDenied,
+        Ok(_) => LockAccessHint::NotAuthorized,
+    }
+}
+
+fn format_open_denied(path: &Path, hint: LockAccessHint, os: &io::Error) -> String {
+    match hint {
+        LockAccessHint::GroupMissing => format!(
+            "no se pudo abrir el candado {}: {os}. El grupo keybackcon no existe; \
+             instala el paquete (sysusers.d/tmpfiles.d) antes de escribir",
+            path.display()
+        ),
+        LockAccessHint::NotAuthorized => format!(
+            "no se pudo abrir el candado {}: permiso denegado. \
+             Instalar no autoriza: añade tu usuario al grupo con \
+             `sudo usermod -aG keybackcon \"$USER\"` y abre una sesión nueva \
+             (o `newgrp keybackcon`). Error del sistema: {os}",
+            path.display()
+        ),
+        LockAccessHint::StillDenied => format!(
+            "no se pudo abrir el candado {}: permiso denegado pese a pertenecer \
+             al grupo keybackcon. Comprueba que el fichero sea root:keybackcon \
+             modo 0660 y el directorio /run/keybackcon modo 0770. Error: {os}",
+            path.display()
+        ),
+    }
+}
+
+fn diagnose_open_failure(path: &Path, e: io::Error, relaxed: bool) -> io::Error {
+    if e.kind() == io::ErrorKind::NotFound {
+        return io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "no existe el candado {}. Reinstala el paquete (tmpfiles.d) o ejecuta \
+                 `sudo systemd-tmpfiles --create keybackcon.conf`. Error: {e}",
+                path.display()
+            ),
+        );
+    }
+    if relaxed {
+        return denied(format!("no se pudo abrir el candado {}: {e}", path.display()));
+    }
+    denied(format_open_denied(
+        path,
+        lock_access_hint(keybackcon_gid()),
+        &e,
+    ))
 }
 
 fn keybackcon_gid() -> io::Result<u32> {
@@ -232,6 +295,25 @@ fn keybackcon_gid() -> io::Result<u32> {
     }
     // SAFETY: getgrnam devolvió un grupo; solo leemos gr_gid.
     Ok(unsafe { (*ptr).gr_gid })
+}
+
+/// ¿El proceso actual tiene el GID (real, efectivo o suplementario)?
+fn user_has_gid(gid: u32) -> bool {
+    // SAFETY: getgid/getegid no toman argumentos y solo leen credenciales.
+    if unsafe { getgid() } == gid || unsafe { getegid() } == gid {
+        return true;
+    }
+    // SAFETY: size 0 consulta la longitud; el segundo getgroups rellena el buffer.
+    let n = unsafe { getgroups(0, std::ptr::null_mut()) };
+    if n <= 0 {
+        return false;
+    }
+    let mut buf = vec![0u32; n as usize];
+    let filled = unsafe { getgroups(n, buf.as_mut_ptr()) };
+    if filled <= 0 {
+        return false;
+    }
+    buf[..filled as usize].contains(&gid)
 }
 
 fn denied(msg: String) -> io::Error {
@@ -387,5 +469,38 @@ mod tests {
         let err = validate_installed_parent(&link).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::PermissionDenied, "{err}");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn diagnostico_unificado_instalar_no_autoriza() {
+        let path = Path::new("/run/keybackcon/writer.lock");
+        let os = io::Error::from_raw_os_error(13); // EACCES
+        let msg = format_open_denied(path, LockAccessHint::NotAuthorized, &os);
+        assert!(msg.contains("Instalar no autoriza"), "{msg}");
+        assert!(msg.contains("usermod -aG keybackcon"), "{msg}");
+        assert!(msg.contains("sesión nueva") || msg.contains("newgrp"), "{msg}");
+
+        let missing = format_open_denied(path, LockAccessHint::GroupMissing, &os);
+        assert!(missing.contains("grupo keybackcon no existe"), "{missing}");
+
+        let still = format_open_denied(path, LockAccessHint::StillDenied, &os);
+        assert!(still.contains("0660"), "{still}");
+        assert!(still.contains("0770"), "{still}");
+    }
+
+    #[test]
+    fn pista_grupo_ausente_sin_getgrnam() {
+        let hint = lock_access_hint(Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "sin grupo",
+        )));
+        assert_eq!(hint, LockAccessHint::GroupMissing);
+    }
+
+    #[test]
+    fn user_has_gid_reconoce_egid() {
+        let egid = unsafe { getegid() };
+        assert!(user_has_gid(egid), "el egid del proceso debe coincidir");
+        assert!(!user_has_gid(u32::MAX), "GID imposible no debe coincidir");
     }
 }
