@@ -599,32 +599,43 @@ mod tests {
         )
     }
 
-    fn sleep_bin() -> &'static Path {
-        let p = Path::new("/bin/sleep");
-        if p.exists() {
-            p
-        } else {
-            Path::new("/usr/bin/sleep")
-        }
-    }
-
-    /// Copia/enlace de `sleep` con basename exacto (exe + argv0) para identidad estricta.
-    /// Vive en `runtime/fixtures/` para no chocar con el dir `keybackcon/`.
+    /// Copia del binario de test con basename exacto (exe + argv0).
+    /// No usamos `sleep`: en runners con rust-coreutils/uutils el multicall
+    /// muere al renombrarse (`coreutils: unknown program 'keybackcon'`).
+    /// Copiamos (no hardlink) para que `/proc/<pid>/exe` resuelva a `name`.
     fn fixture_anim_bin(runtime: &Path, name: &str) -> PathBuf {
         let fixtures = runtime.join("fixtures");
         fs::create_dir_all(&fixtures).expect("crear fixtures");
         let dest = fixtures.join(name);
         let _ = fs::remove_file(&dest);
-        if fs::hard_link(sleep_bin(), &dest).is_err() {
-            fs::copy(sleep_bin(), &dest).expect("copiar sleep como fixture");
-        }
+        let src = std::env::current_exe().expect("current_exe");
+        fs::copy(&src, &dest).expect("copiar binario de test como fixture");
+        let mut perms = fs::metadata(&dest).expect("meta fixture").permissions();
+        perms.set_mode(perms.mode() | 0o111);
+        fs::set_permissions(&dest, perms).expect("chmod +x fixture");
         dest
+    }
+
+    /// Hijo que solo duerme cuando el padre fija `KEYBACKCON_ANIM_FIXTURE_SLEEP`.
+    #[test]
+    fn fixture_sleep_child() {
+        let Ok(secs) = std::env::var("KEYBACKCON_ANIM_FIXTURE_SLEEP") else {
+            return;
+        };
+        let n: u64 = secs.parse().unwrap_or(1);
+        std::thread::sleep(Duration::from_secs(n));
+        std::process::exit(0);
     }
 
     fn live_named_child(runtime: &Path, name: &str, secs: &str) -> Child {
         let bin = fixture_anim_bin(runtime, name);
         // Sueño corto: en sandboxes que bloquean señales no queremos esperar 60 s.
-        Command::new(&bin).arg(secs).spawn().unwrap()
+        Command::new(&bin)
+            .args(["--exact", "animation::tests::fixture_sleep_child"])
+            .env("KEYBACKCON_ANIM_FIXTURE_SLEEP", secs)
+            .env_remove("RUST_TEST_THREADS")
+            .spawn()
+            .unwrap()
     }
 
     fn wait_exe_basename(pid: u32, expected: &str) {

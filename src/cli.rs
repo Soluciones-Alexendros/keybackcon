@@ -637,20 +637,24 @@ mod tests {
         assert_eq!(state::load_persisted().unwrap().brightness, 50);
 
         // Identidad estricta (KBC-06): basename exacto de exe/argv0, no subcadena.
+        // Copia del binario de test (no `sleep`/uutils multicall) para que el
+        // proceso viva y `/proc/<pid>/exe` resuelva a `keybackcon`.
         let fixtures = runtime.join("fixtures");
         fs::create_dir_all(&fixtures).unwrap();
         let anim_bin = fixtures.join("keybackcon");
         let _ = fs::remove_file(&anim_bin);
-        let sleep = if Path::new("/bin/sleep").exists() {
-            Path::new("/bin/sleep")
-        } else {
-            Path::new("/usr/bin/sleep")
-        };
-        if fs::hard_link(sleep, &anim_bin).is_err() {
-            fs::copy(sleep, &anim_bin).expect("copiar sleep como fixture keybackcon");
+        fs::copy(std::env::current_exe().unwrap(), &anim_bin)
+            .expect("copiar binario de test como fixture keybackcon");
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&anim_bin).unwrap().permissions();
+            perms.set_mode(perms.mode() | 0o111);
+            fs::set_permissions(&anim_bin, perms).unwrap();
         }
         let mut anim = std::process::Command::new(&anim_bin)
-            .arg("8")
+            .args(["--exact", "animation::tests::fixture_sleep_child"])
+            .env("KEYBACKCON_ANIM_FIXTURE_SLEEP", "8")
+            .env_remove("RUST_TEST_THREADS")
             .spawn()
             .expect("animación falsa");
         let anim_pid = anim.id().cast_signed();
