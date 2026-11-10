@@ -262,7 +262,10 @@ impl Drop for AnimationLock {
 /// Ejecuta `mode` (`breathe`/`rainbow`) a `fps` (1–60).
 ///
 /// Orden: parar la anterior; si sigue viva, abortar sin abrir el HID; tomar el
-/// candado común; revalidar; abrir el dispositivo. El `Drop` suelta el candado.
+/// candado común; revalidar; abrir el dispositivo; **entonces** publicar el
+/// modo (KBC-04). El guardado final coordinado ocurre **antes** de soltar
+/// `AnimationLock` (KBC-05). El candado de estado solo se toma en transacciones
+/// breves, nunca durante todo el bucle.
 pub fn run_animation(mode: &str, fps: u64) -> io::Result<()> {
     match stop_animation() {
         StopResult::SigueViva => {
@@ -287,6 +290,8 @@ pub fn run_animation(mode: &str, fps: u64) -> io::Result<()> {
 
     let mut lamp = Lamp::open()?;
     lamp.autonomous(false)?;
+    // KBC-04: no publicar modo/on hasta tener candado HID + dispositivo.
+    let run_id = state::begin_animation_mode(mode)?;
 
     let dt = Duration::from_micros(1_000_000 / fps.clamp(1, MAX_FPS));
     let t0 = Instant::now();
@@ -324,6 +329,8 @@ pub fn run_animation(mode: &str, fps: u64) -> io::Result<()> {
             std::thread::sleep(dt);
         }
     })();
+    // KBC-05: transición final con el candado de animación aún tomado.
+    let _ = state::end_animation_mode(run_id);
     drop(lock);
     result
 }
