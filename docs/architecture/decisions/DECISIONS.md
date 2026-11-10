@@ -1,11 +1,5 @@
 # Decisiones (ADR breves)
 
-### Propósito de este documento
-
-- **Objetivos:** Conservar el registro de ADR vivos (nombre, cero deps, HID, GUI, calidad) y el motivo de cada uno.
-- **Estructura:** Tabla índice → un apartado por ADR.
-- **Contenido a integrar según contexto:** No copies ADR de otro crate. Un cambio de protocolo o de dependencias exige un ADR nuevo aquí. La arquitectura narrativa está en [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
-
 | ID | Título | Estado | Resumen |
 |---|---|---|---|
 | 1 | Nombre `keybackcon` | Aceptada | Un solo nombre para binario, repo y App ID, con migración heredada desde `kbd-rgb`. |

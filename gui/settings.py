@@ -2,22 +2,17 @@ import os
 import threading
 
 try:
-    from gui import load, log_exc, gettext_func
+    from gui import UNKNOWN_VERSION, api, app_version
 except ImportError:  # ejecución directa: gui/ en sys.path
-    import importlib
     import sys
 
-    def load(nombre):
-        return importlib.import_module(nombre)
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(_here)
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from gui import UNKNOWN_VERSION, api, app_version
 
-    def gettext_func():
-        mod = importlib.import_module("i18n")
-        return mod._
-
-    def log_exc(contexto):
-        tipo, exc, _tb = sys.exc_info()
-        print(f"keybackcon-gui: {contexto}: {tipo.__name__}: {exc}",
-              file=sys.stderr)
+load, log_exc, gettext_func = api(__file__)
 
 try:
     import gi
@@ -38,12 +33,9 @@ set_theme = _theme.set_theme
 lookup_settings = _theme.lookup_settings
 
 try:
-    from gui import __version__ as APP_VERSION
-except ImportError:
-    try:
-        from . import __version__ as APP_VERSION
-    except ImportError:
-        APP_VERSION = "2.2.1"
+    APP_VERSION = app_version()
+except Exception:
+    APP_VERSION = UNKNOWN_VERSION
 
 _ = gettext_func()
 

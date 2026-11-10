@@ -1,11 +1,5 @@
 # Runbook: dispositivo HID y udev
 
-### Propósito de este documento
-
-- **Objetivos:** Diagnosticar “no encuentra el teclado”, permiso denegado en hidraw y animación que no para.
-- **Estructura:** Síntoma → comprobación → acción.
-- **Contenido a integrar según contexto:** Adapta rutas udev y comandos de este binario. No copies runbooks de otro HID. Nunca pidas pegar dumps con datos personales.
-
 | Síntoma | Comprobación | Acción |
 | --- | --- | --- |
 | No encuentra el teclado | `keybackcon info`; USB conectado; descriptor `05 59 09 01 A1 01` | Revisa el cable; solo AERO X16 (LampArray). Spec en [`../architecture/protocol.md`](../architecture/protocol.md). |
