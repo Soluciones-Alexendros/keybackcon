@@ -1,8 +1,7 @@
-"""Pruebas de BackendQueue / RetryBook sin display (KBC-08/09/41)."""
+"""Pruebas de BackendQueue / RetryBook sin display (KBC-08/09/41/32)."""
 from __future__ import annotations
 
 import threading
-import time
 import unittest
 
 import gui.backend as backend
@@ -47,6 +46,11 @@ class FakeClient:
     def restore(self):
         self._gate("restore")
         self.calls.append(("restore", None))
+
+
+def _close_and_join(q: BackendQueue, timeout: float = 2.0) -> None:
+    q.close()
+    assert q.join(timeout=timeout), "worker no terminó tras close()"
 
 
 class TestRetryBook(unittest.TestCase):
@@ -135,8 +139,7 @@ class TestBackendQueueKbc41(unittest.TestCase):
         # Sin el arreglo KBC-41 esto deadlockeaba bajo el Lock.
         stop_gate.set()
         self.assertTrue(done.wait(timeout=3), "timeout: posible deadlock reentrante")
-        q.close()
-        time.sleep(0.05)
+        _close_and_join(q)
 
         self.assertIn(("old", False, "sustituido"), results)
         kinds = [c[0] for c in client.calls]
@@ -154,16 +157,61 @@ class TestBackendQueueConsolidacion(unittest.TestCase):
         backend.GLib = self._prev_glib
 
     def test_consolida_brillo(self):
-        client = FakeClient()
+        """KBC-32: consolidación con barreras; callbacks exactamente una vez; join tras close."""
+        client = FakeClient(hold_kinds={"stop"})
         q = BackendQueue(client)
-        done = []
-        q.submit(Intent("brightness", 10, lambda ok, e: done.append(1)))
-        q.submit(Intent("brightness", 20, lambda ok, e: done.append(2)))
-        q.submit(Intent("brightness", 30, lambda ok, e: done.append(3)))
-        time.sleep(0.25)
-        q.close()
-        time.sleep(0.05)
-        self.assertEqual([c for c in client.calls if c[0] == "brightness"][-1:], [("brightness", 30)])
+        lock = threading.Lock()
+        seen: list[tuple[int, bool, str | None]] = []
+        all_done = threading.Event()
+
+        def make_cb(tag: int):
+            def cb(ok, err):
+                with lock:
+                    seen.append((tag, ok, err))
+                    if len(seen) >= 3:
+                        all_done.set()
+
+            return cb
+
+        stop_entered = client._entered.setdefault("stop", threading.Event())
+        stop_gate = client._gates.setdefault("stop", threading.Event())
+        q.submit(Intent("stop"))
+        self.assertTrue(stop_entered.wait(timeout=2), "worker no entró en stop")
+
+        q.submit(Intent("brightness", 10, make_cb(10)))
+        q.submit(Intent("brightness", 20, make_cb(20)))
+        q.submit(Intent("brightness", 30, make_cb(30)))
+
+        # Con GLib=None, sustituido es síncrono en submit.
+        with lock:
+            self.assertEqual(
+                seen,
+                [(10, False, "sustituido"), (20, False, "sustituido")],
+            )
+
+        stop_gate.set()
+        self.assertTrue(all_done.wait(timeout=3), "timeout esperando callback final")
+
+        with lock:
+            self.assertEqual(
+                seen,
+                [
+                    (10, False, "sustituido"),
+                    (20, False, "sustituido"),
+                    (30, True, None),
+                ],
+            )
+            # Exactamente una vez por intención.
+            self.assertEqual(len(seen), 3)
+            self.assertEqual(len({t for t, _, _ in seen}), 3)
+
+        self.assertEqual(
+            [c for c in client.calls if c[0] == "brightness"],
+            [("brightness", 30)],
+        )
+
+        _close_and_join(q)
+        self.assertFalse(q._thread.is_alive())
 
 
 class TestRetryIntentInmutable(unittest.TestCase):

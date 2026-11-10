@@ -165,6 +165,11 @@ class BackendQueue:
         self._closed = True
         self._q.put(None)
 
+    def join(self, timeout: float | None = None) -> bool:
+        """Espera al worker tras ``close``. Devuelve True si el hilo terminó."""
+        self._thread.join(timeout=timeout)
+        return not self._thread.is_alive()
+
     def _emit(self, cb, ok: bool, err: str | None) -> None:
         if GLib is None:
             try:
