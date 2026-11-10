@@ -190,7 +190,7 @@ fn open_writer_file(path: &Path, relaxed: bool) -> io::Result<File> {
         .write(true)
         .custom_flags(O_NOFOLLOW)
         .open(path)
-        .map_err(|e| diagnose_open_failure(path, e, relaxed))?;
+        .map_err(|e| diagnose_open_failure(path, &e, relaxed))?;
     let meta = file.metadata()?;
     if !meta.is_file() {
         return Err(denied(format!(
@@ -231,10 +231,10 @@ enum LockAccessHint {
     StillDenied,
 }
 
-fn lock_access_hint(gid: io::Result<u32>) -> LockAccessHint {
+fn lock_access_hint(gid: &io::Result<u32>) -> LockAccessHint {
     match gid {
         Err(_) => LockAccessHint::GroupMissing,
-        Ok(g) if user_has_gid(g) => LockAccessHint::StillDenied,
+        Ok(g) if user_has_gid(*g) => LockAccessHint::StillDenied,
         Ok(_) => LockAccessHint::NotAuthorized,
     }
 }
@@ -262,7 +262,7 @@ fn format_open_denied(path: &Path, hint: LockAccessHint, os: &io::Error) -> Stri
     }
 }
 
-fn diagnose_open_failure(path: &Path, e: io::Error, relaxed: bool) -> io::Error {
+fn diagnose_open_failure(path: &Path, e: &io::Error, relaxed: bool) -> io::Error {
     if e.kind() == io::ErrorKind::NotFound {
         return io::Error::new(
             io::ErrorKind::NotFound,
@@ -281,8 +281,8 @@ fn diagnose_open_failure(path: &Path, e: io::Error, relaxed: bool) -> io::Error 
     }
     denied(format_open_denied(
         path,
-        lock_access_hint(keybackcon_gid()),
-        &e,
+        lock_access_hint(&keybackcon_gid()),
+        e,
     ))
 }
 
@@ -308,15 +308,21 @@ fn user_has_gid(gid: u32) -> bool {
     }
     // SAFETY: size 0 consulta la longitud; el segundo getgroups rellena el buffer.
     let n = unsafe { getgroups(0, std::ptr::null_mut()) };
-    if n <= 0 {
+    let Ok(len) = usize::try_from(n) else {
+        return false;
+    };
+    if len == 0 {
         return false;
     }
-    let mut buf = vec![0u32; n as usize];
+    let mut buf = vec![0u32; len];
     let filled = unsafe { getgroups(n, buf.as_mut_ptr()) };
-    if filled <= 0 {
+    let Ok(filled_len) = usize::try_from(filled) else {
+        return false;
+    };
+    if filled_len == 0 {
         return false;
     }
-    buf[..filled as usize].contains(&gid)
+    buf[..filled_len].contains(&gid)
 }
 
 fn denied(msg: String) -> io::Error {
@@ -496,7 +502,8 @@ mod tests {
 
     #[test]
     fn pista_grupo_ausente_sin_getgrnam() {
-        let hint = lock_access_hint(Err(io::Error::new(io::ErrorKind::NotFound, "sin grupo")));
+        let gid = Err(io::Error::new(io::ErrorKind::NotFound, "sin grupo"));
+        let hint = lock_access_hint(&gid);
         assert_eq!(hint, LockAccessHint::GroupMissing);
     }
 
