@@ -153,17 +153,50 @@ fi
 
 if [ "${KEYBACKCON_SKIP_UDEV:-0}" != "1" ]; then
   echo "==> keybackcon: grupo y candado de escritura (pide sudo)"
-  sudo install -D -m644 "${REPO_DIR}/packaging/sysusers.d/keybackcon.conf" /usr/lib/sysusers.d/keybackcon.conf
-  sudo install -D -m644 "${REPO_DIR}/packaging/tmpfiles.d/keybackcon.conf" /usr/lib/tmpfiles.d/keybackcon.conf
+  writer_lock_ok=1
+  if ! sudo install -D -m644 "${REPO_DIR}/packaging/sysusers.d/keybackcon.conf" /usr/lib/sysusers.d/keybackcon.conf; then
+    echo "    error: no se pudo instalar sysusers.d/keybackcon.conf" >&2
+    writer_lock_ok=0
+  fi
+  if ! sudo install -D -m644 "${REPO_DIR}/packaging/tmpfiles.d/keybackcon.conf" /usr/lib/tmpfiles.d/keybackcon.conf; then
+    echo "    error: no se pudo instalar tmpfiles.d/keybackcon.conf" >&2
+    writer_lock_ok=0
+  fi
   if command -v systemd-sysusers >/dev/null 2>&1; then
-    sudo systemd-sysusers keybackcon.conf || true
+    if ! sudo systemd-sysusers keybackcon.conf; then
+      echo "    error: systemd-sysusers keybackcon.conf falló" >&2
+      writer_lock_ok=0
+    fi
+  else
+    echo "    aviso: systemd-sysusers no disponible; crea el grupo keybackcon a mano" >&2
+    writer_lock_ok=0
   fi
   if command -v systemd-tmpfiles >/dev/null 2>&1; then
-    sudo systemd-tmpfiles --create keybackcon.conf || true
+    if ! sudo systemd-tmpfiles --create keybackcon.conf; then
+      echo "    error: systemd-tmpfiles --create keybackcon.conf falló" >&2
+      writer_lock_ok=0
+    fi
+  else
+    echo "    aviso: systemd-tmpfiles no disponible; crea /run/keybackcon a mano" >&2
+    writer_lock_ok=0
   fi
-  if ! id -nG "${USER}" | tr ' ' '\n' | grep -qx keybackcon; then
-    sudo usermod -aG keybackcon "${USER}" || true
-    echo "==> keybackcon: sesión nueva para usar el grupo keybackcon"
+  if [ ! -d /run/keybackcon ] || [ ! -e /run/keybackcon/writer.lock ]; then
+    echo "    error: falta /run/keybackcon/writer.lock tras tmpfiles" >&2
+    writer_lock_ok=0
+  fi
+  if [ "$writer_lock_ok" = 1 ]; then
+    echo "==> keybackcon: candado instalado (root:keybackcon 0660; dir 0770)"
+  else
+    echo "==> keybackcon: candado incompleto; sin él el CLI no escribe" >&2
+  fi
+  # Instalar ≠ autorizar: no añadimos usuarios al grupo automáticamente (KBC-01/11).
+  if id -nG "${USER}" 2>/dev/null | tr ' ' '\n' | grep -qx keybackcon; then
+    echo "==> keybackcon: ${USER} ya está en el grupo keybackcon"
+  else
+    echo "==> keybackcon: autorización de escritura pendiente"
+    echo "    Instalar no te mete en el grupo. Para poder escribir:"
+    echo "      sudo usermod -aG keybackcon ${USER}"
+    echo "    Luego cierra sesión y vuelve a entrar (o: newgrp keybackcon)."
   fi
 fi
 
@@ -196,4 +229,10 @@ if [ "$tray_ok" = 0 ]; then
   echo "    pista: $(pkg_hint tray)" >&2
 fi
 
-echo "OK: keybackcon instalado. Prueba con: keybackcon info"
+if id -nG "${USER}" 2>/dev/null | tr ' ' '\n' | grep -qx keybackcon; then
+  echo "OK: keybackcon instalado. Prueba con: keybackcon info"
+else
+  echo "OK: keybackcon instalado (binarios/udev/candado)."
+  echo "    Escritura HID pendiente de autorización (grupo keybackcon). Ver mensajes arriba."
+  echo "    Consulta sin escribir: keybackcon info"
+fi

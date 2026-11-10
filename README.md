@@ -33,7 +33,7 @@ La mesa de luz vive también en la **bandeja del sistema**
    (binario, GUI, icono, regla udev y unidades de usuario). Debian 12:
    el CLI funciona; la mesa de luz nativa exige libadwaita ≥ 1.5 (ver matriz).
 2. **Script local (`~/.local`):** `./scripts/install.sh`
-   (pide sudo una vez para la regla udev).
+   (pide sudo para udev, sysusers y tmpfiles).
 3. **npm (solo CLI):** `npm install -g keybackcon` instala el binario
    precompilado (Linux x86_64/arm64) y, si el postinstalador lo permite, la
    regla udev y unidades de usuario. **No** incluye la mesa de luz GTK ni
@@ -44,6 +44,15 @@ La mesa de luz vive también en la **bandeja del sistema**
    como probado. Mientras tanto: script local o binario de la release.
 5. **Fedora:** usa el script local o el CLI de npm. El empaquetado RPM **no
    está verificado** aún.
+
+**Instalar ≠ autorizar.** El paquete crea el grupo `keybackcon` y el candado
+`/run/keybackcon/writer.lock`, pero **no** añade tu usuario al grupo. Para
+escribir al teclado:
+
+```bash
+sudo usermod -aG keybackcon "$USER"
+# cierra sesión y vuelve a entrar (o: newgrp keybackcon)
+```
 
 Cada release trae además el tarball `keybackcon-vX.Y.Z-linux-x86_64.tar.gz`,
 `SHA256SUMS` y SBOM CycloneDX (inventario del crate Rust; la GUI tiene
@@ -113,6 +122,7 @@ diseño en [`ARCHITECTURE.md`](ARCHITECTURE.md) y decisiones en [`docs/architect
 |---|---|
 | No encuentra el teclado | Revisa la conexión y prueba `keybackcon info` |
 | Permiso denegado en `/dev/hidraw*` | `sudo udevadm trigger` y **vuelve a iniciar sesión** |
+| Permiso denegado al candado / «Instalar no autoriza» | `sudo usermod -aG keybackcon "$USER"` y sesión nueva |
 | La animación no para | `keybackcon stop` |
 
 Runbook: [`docs/runbooks/dispositivo.md`](docs/runbooks/dispositivo.md).
