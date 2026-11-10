@@ -51,12 +51,24 @@ jobs:
             msgfmt -c -o "gui/locale/$lang/LC_MESSAGES/keybackcon.mo" "$po"
           done
       - name: GUI tests
+        env:
+          KEYBACKCON_REQUIRE_DBUS: "1"
+          KEYBACKCON_GUI_TESTS: "1"
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq python3-gi gir1.2-glib-2.0 dbus
+          sudo apt-get install -y -qq \
+            python3-gi \
+            gir1.2-glib-2.0 \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1 \
+            dbus \
+            xvfb
           python3 -c "from gi.repository import Gio, GLib; print('GLib', GLib.MAJOR_VERSION, GLib.MINOR_VERSION)"
-          KEYBACKCON_REQUIRE_DBUS=1 python3 -m unittest discover -s gui/tests
+          python3 -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; print('GTK', Gtk.get_major_version(), Gtk.get_minor_version(), 'Adw OK')"
+          # Display virtual: sin xvfb Adw.Application no arranca y la suite
+          # KEYBACKCON_GUI_TESTS quedaría omitida o en rojo opaco.
+          GDK_BACKEND=x11 xvfb-run -a python3 -m unittest discover -s gui/tests -v
       - name: shellcheck
         run: |
           set -euo pipefail

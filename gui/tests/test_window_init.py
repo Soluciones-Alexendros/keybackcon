@@ -39,8 +39,17 @@ class FakeClient:
         return None
 
 
+# En CI la suite gráfica es obligatoria: sin KEYBACKCON_GUI_TESTS=1 el
+# discover omitiría TestWindowInitSinEscrituras y el job quedaría en verde.
+_GUI_SUITE = os.environ.get("KEYBACKCON_GUI_TESTS") == "1"
+if os.environ.get("CI") == "true" and not _GUI_SUITE:
+    raise RuntimeError(
+        "en CI la suite gráfica es obligatoria: define KEYBACKCON_GUI_TESTS=1"
+    )
+
+
 @unittest.skipUnless(
-    os.environ.get("KEYBACKCON_GUI_TESTS") == "1",
+    _GUI_SUITE,
     "requiere GTK/Adw en display (KEYBACKCON_GUI_TESTS=1)",
 )
 class TestWindowInitSinEscrituras(unittest.TestCase):
@@ -53,9 +62,9 @@ class TestWindowInitSinEscrituras(unittest.TestCase):
 
         from gui.preflight import check_gui_requirements
 
-        ok, _msg = check_gui_requirements()
+        ok, msg = check_gui_requirements()
         if not ok:
-            self.skipTest("libadwaita insuficiente para la ventana")
+            self.fail(f"KEYBACKCON_GUI_TESTS=1 pero GUI no usable: {msg}")
 
         from gui.window import MesaWindow
 
