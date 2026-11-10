@@ -39,12 +39,13 @@ class FakeClient:
         return None
 
 
-# En CI la suite gráfica es obligatoria: sin KEYBACKCON_GUI_TESTS=1 el
-# discover omitiría TestWindowInitSinEscrituras y el job quedaría en verde.
+# El job quality exige la suite gráfica con KEYBACKCON_REQUIRE_GUI_SUITE=1.
+# Smoke y otros entornos con CI=true no la fuerzan (sin GTK/xvfb).
 _GUI_SUITE = os.environ.get("KEYBACKCON_GUI_TESTS") == "1"
-if os.environ.get("CI") == "true" and not _GUI_SUITE:
+if os.environ.get("KEYBACKCON_REQUIRE_GUI_SUITE") == "1" and not _GUI_SUITE:
     raise RuntimeError(
-        "en CI la suite gráfica es obligatoria: define KEYBACKCON_GUI_TESTS=1"
+        "suite gráfica obligatoria: define KEYBACKCON_GUI_TESTS=1 "
+        "(junto a KEYBACKCON_REQUIRE_GUI_SUITE=1)"
     )
 
 

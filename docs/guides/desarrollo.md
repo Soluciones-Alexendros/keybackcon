@@ -11,7 +11,7 @@ Checklist ejecutable (en orden; la fachada es `make validate`):
 - [ ] `make lint` — fmt, clippy `--all-targets -D warnings`, rustdoc, `py_compile` de `gui/*.py`
 - [ ] `make test` — `cargo test -- --test-threads=1` (43 tests; los de pid usan `XDG_RUNTIME_DIR` temporal)
 - [ ] `make i18n` — regenera `po/keybackcon.pot` y compila los `.mo` en `gui/locale/` (los tests de i18n los necesitan)
-- [ ] `python3 -m unittest discover -s gui/tests` — tests de la GUI (sin display ni hardware; el control D-Bus necesita `python3-gi` y `dbus-daemon`). En CI van con `KEYBACKCON_GUI_TESTS=1` + `xvfb-run` (GTK4/Adw); sin ese flag `test_window_init` se omite en local y en CI falla a propósito
+- [ ] `python3 -m unittest discover -s gui/tests` — tests de la GUI (sin display ni hardware; el control D-Bus necesita `python3-gi` y `dbus-daemon`). En el job `quality` van con `KEYBACKCON_REQUIRE_GUI_SUITE=1` + `KEYBACKCON_GUI_TESTS=1` + `xvfb-run` (GTK4/Adw); sin el flag de suite `test_window_init` se omite (smoke no lo exige)
 - [ ] `make check-i18n` — coherencia `.pot`/`.po` y sin cadenas sin traducir
 - [ ] `make smoke` — `./scripts/smoke.sh` (binario + GUI + packaging + tests unitarios)
 - [ ] `./scripts/install.sh` — instala en `~/.local` + udev (sudo) + unidades de usuario

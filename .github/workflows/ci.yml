@@ -53,6 +53,7 @@ jobs:
       - name: GUI tests
         env:
           KEYBACKCON_REQUIRE_DBUS: "1"
+          KEYBACKCON_REQUIRE_GUI_SUITE: "1"
           KEYBACKCON_GUI_TESTS: "1"
         run: |
           set -euo pipefail
