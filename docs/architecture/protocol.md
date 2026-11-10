@@ -1,11 +1,5 @@
 # Protocolo
 
-### Propósito de este documento
-
-- **Objetivos:** Fijar los bytes del cable (LampArray HID) para depurar sin ingeniería inversa ni literales duplicados.
-- **Estructura:** Detección → informes 1/5/6 → brillo por escala RGB.
-- **Contenido a integrar según contexto:** La fuente de verdad en código es `src/protocol.rs`. No copies descriptores de otro teclado. El mapa de módulos está en [`ARCHITECTURE.md`](../../ARCHITECTURE.md).
-
 USB HID Usage Tables v1.4, §26 "Lighting And Illumination Page" (Usage Page
 `0x59`). Sin ingeniería inversa: el firmware expone un LampArray estándar.
 Fuente única de valores en el código: `src/protocol.rs` (`src/lamp.rs` solo
@@ -29,5 +23,13 @@ Usage LampArray, Collection Application), localizada vía la subruta sysfs
 
 El dispositivo declara `IntensityLevelCount=1`: no hay canal de brillo
 separable. `brightness N` guarda un porcentaje 0–100 y reemite
-`scale(base, pct)` con redondeo (`(v*pct+50)/100`). El estado persiste como
-`"<hex> <pct>"`, p. ej. `ff7800 60`.
+`scale(base, pct)` con redondeo (`(v*pct+50)/100`).
+
+## Persistencia (fuera del cable)
+
+El protocolo HID no define el fichero de estado. En disco, `src/state.rs`
+persiste un esquema versionado (`schema_version=1`) con `base_color`,
+`brightness`, `power`, `mode` y `restore_policy`. El formato plano
+`"<hex> <pct>"` (p. ej. `ff7800 60`) solo se lee como legado. Detalle de
+sesión y clientes: [`docs/product/contrato.md`](../../product/contrato.md)
+y [`ARCHITECTURE.md`](../../ARCHITECTURE.md).
