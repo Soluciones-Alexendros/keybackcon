@@ -7,10 +7,14 @@
 //! que una limpieza obsoleta pise un `off` nuevo (KBC-05).
 
 use std::fs::{self, File};
-use std::io;
+use std::io::{self, Write};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::os::unix::io::AsRawFd;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// `O_NOFOLLOW` en Linux: el temporal de estado no sigue enlaces.
+const O_NOFOLLOW: i32 = 0o400_000;
 
 use crate::color::{self, Rgb};
 use crate::lamp::Lamp;
@@ -152,18 +156,41 @@ fn new_run_id() -> u64 {
     low ^ (u64::from(std::process::id()) << 32)
 }
 
+/// Resultado del oráculo de parseo compartido con la GUI (KBC-12 / KBC-16).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateParseOutcome {
+    /// Instantánea válida (versionada o legado plano).
+    Ok(PersistedState),
+    /// Contenido irreconocible o truncado; el fichero no se reescribe.
+    Corrupt,
+    /// `schema_version` futura o nula; el fichero no se reescribe.
+    UnsupportedVersion(u32),
+}
+
+fn parse_brightness(raw: &str) -> Option<u32> {
+    let n: i64 = raw.trim().parse().ok()?;
+    Some(u32::try_from(n.clamp(0, 100)).unwrap_or(0))
+}
+
+fn looks_versioned(raw: &str) -> bool {
+    raw.lines().any(|line| {
+        let line = line.trim();
+        !line.is_empty()
+            && !line.starts_with('#')
+            && line
+                .split_once('=')
+                .is_some_and(|(k, _)| k.trim() == "schema_version")
+    })
+}
+
 fn parse_legacy_line(raw: &str) -> Option<(Rgb, u32)> {
     let mut it = raw.split_whitespace();
     let c = it.next().and_then(|s| color::parse_color(s).ok())?;
-    let p = it
-        .next()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(100u32)
-        .clamp(0, 100);
+    let p = it.next().map_or(Some(100u32), parse_brightness)?;
     Some((c, p))
 }
 
-fn parse_versioned(raw: &str) -> Option<PersistedState> {
+fn parse_versioned(raw: &str) -> StateParseOutcome {
     let mut st = PersistedState::default();
     let mut saw_version = false;
     for line in raw.lines() {
@@ -171,59 +198,95 @@ fn parse_versioned(raw: &str) -> Option<PersistedState> {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        if let Some((k, v)) = line.split_once('=') {
-            match k.trim() {
-                "schema_version" => {
-                    let ver: u32 = v.trim().parse().ok()?;
-                    if ver == 0 || ver > SCHEMA_VERSION {
-                        return None;
-                    }
-                    saw_version = true;
+        let Some((k, v)) = line.split_once('=') else {
+            continue;
+        };
+        match k.trim() {
+            "schema_version" => {
+                let Ok(ver) = v.trim().parse::<u32>() else {
+                    return StateParseOutcome::Corrupt;
+                };
+                if ver == 0 || ver > SCHEMA_VERSION {
+                    return StateParseOutcome::UnsupportedVersion(ver);
                 }
-                "base_color" => st.base_color = color::parse_color(v.trim()).ok()?,
-                "brightness" => {
-                    st.brightness = v.trim().parse::<u32>().ok()?.clamp(0, 100);
-                }
-                "power" => st.power = v.trim().to_string(),
-                "mode" => st.mode = v.trim().to_string(),
-                "restore_policy" => st.restore_policy = v.trim().to_string(),
-                _ => {}
+                saw_version = true;
             }
+            "base_color" => match color::parse_color(v.trim()) {
+                Ok(c) => st.base_color = c,
+                Err(_) => return StateParseOutcome::Corrupt,
+            },
+            "brightness" => match parse_brightness(v) {
+                Some(p) => st.brightness = p,
+                None => return StateParseOutcome::Corrupt,
+            },
+            "power" => st.power = v.trim().to_string(),
+            "mode" => st.mode = v.trim().to_string(),
+            "restore_policy" => st.restore_policy = v.trim().to_string(),
+            _ => {}
         }
     }
-    saw_version.then_some(st)
+    if saw_version {
+        StateParseOutcome::Ok(st)
+    } else {
+        StateParseOutcome::Corrupt
+    }
 }
 
-/// Carga el estado completo; migra el formato plano si hace falta.
-///
-/// Un fichero ausente es el estado por defecto. Un entorno sin ruta XDG
-/// absoluta es un error: no se usa `/var/tmp`.
-pub fn load_persisted() -> io::Result<PersistedState> {
-    let primary = state_file()?;
-    let raw = match fs::read_to_string(&primary) {
-        Ok(s) => s,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            match fs::read_to_string(legacy_state_file()?) {
-                Ok(s) => s,
-                Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                    return Ok(PersistedState::default());
-                }
-                Err(e) => return Err(e),
-            }
-        }
-        Err(e) => return Err(e),
-    };
-    if let Some(st) = parse_versioned(&raw) {
-        return Ok(st);
+/// Oráculo de texto compartido con `gui/client.py` (KBC-16).
+pub fn parse_state_text(raw: &str) -> StateParseOutcome {
+    if looks_versioned(raw) {
+        return parse_versioned(raw);
     }
-    if let Some((c, p)) = parse_legacy_line(&raw) {
-        return Ok(PersistedState {
+    if let Some((c, p)) = parse_legacy_line(raw) {
+        return StateParseOutcome::Ok(PersistedState {
             base_color: c,
             brightness: p,
             ..PersistedState::default()
         });
     }
-    Ok(PersistedState::default())
+    StateParseOutcome::Corrupt
+}
+
+fn parse_error(kind: &str, path: &Path, detail: impl std::fmt::Display) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!(
+            "estado {kind} en {}; se conserva el original ({detail})",
+            path.display()
+        ),
+    )
+}
+
+fn outcome_to_result(path: &Path, outcome: StateParseOutcome) -> io::Result<PersistedState> {
+    match outcome {
+        StateParseOutcome::Ok(st) => Ok(st),
+        StateParseOutcome::Corrupt => Err(parse_error("corrupto", path, "contenido irreconocible")),
+        StateParseOutcome::UnsupportedVersion(v) => Err(parse_error(
+            "con esquema no soportado",
+            path,
+            format!("schema_version={v}"),
+        )),
+    }
+}
+
+/// Carga el estado completo; migra el formato plano si hace falta.
+///
+/// Ausencia de fichero → defaults. Corrupción o esquema futuro → error y el
+/// original se conserva (KBC-12). Sin ruta XDG absoluta → error (no `/var/tmp`).
+pub fn load_persisted() -> io::Result<PersistedState> {
+    let primary = state_file()?;
+    match fs::read_to_string(&primary) {
+        Ok(raw) => outcome_to_result(&primary, parse_state_text(&raw)),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            let legacy = legacy_state_file()?;
+            match fs::read_to_string(&legacy) {
+                Ok(raw) => outcome_to_result(&legacy, parse_state_text(&raw)),
+                Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(PersistedState::default()),
+                Err(e) => Err(e),
+            }
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Carga `(color base, pct)` — compatibilidad con el API anterior.
@@ -244,10 +307,26 @@ fn serialize(st: &PersistedState) -> String {
     )
 }
 
-/// Persiste el estado de forma atómica. Devuelve error si falla la escritura.
-pub fn save_persisted(st: &PersistedState) -> io::Result<()> {
-    let p = state_file()?;
-    let Some(d) = p.parent() else {
+/// Quita un temporal residual solo si es fichero regular (nunca un symlink).
+fn remove_stale_tmp(tmp: &Path) -> io::Result<()> {
+    match fs::symlink_metadata(tmp) {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+        Ok(meta) if meta.file_type().is_symlink() => Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            format!("{} es un enlace; se rechaza el temporal", tmp.display()),
+        )),
+        Ok(meta) if meta.file_type().is_file() => fs::remove_file(tmp),
+        Ok(_) => Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("{} no es un fichero regular", tmp.display()),
+        )),
+    }
+}
+
+/// Escribe `content` en `path` vía temporal exclusivo `0600` + `rename` (KBC-15).
+fn write_state_atomic(path: &Path, content: &str) -> io::Result<()> {
+    let Some(d) = path.parent() else {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "ruta de estado sin directorio padre",
@@ -255,17 +334,42 @@ pub fn save_persisted(st: &PersistedState) -> io::Result<()> {
     };
     xdg::ensure_private_dir(d)?;
     let tmp = d.join(format!(".state-{}.tmp", std::process::id()));
-    let content = serialize(st);
-    fs::write(&tmp, &content)
-        .and_then(|()| fs::rename(&tmp, &p))
+    remove_stale_tmp(&tmp)?;
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(O_NOFOLLOW)
+        .open(&tmp)
         .map_err(|e| {
-            let _ = fs::remove_file(&tmp);
             io::Error::new(
                 e.kind(),
-                format!("no se pudo guardar el estado en {}: {e}", p.display()),
+                format!(
+                    "no se pudo crear el temporal exclusivo {}: {e}",
+                    tmp.display()
+                ),
             )
         })?;
+    let write_result = (|| {
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+        file.set_permissions(fs::Permissions::from_mode(0o600))?;
+        drop(file);
+        fs::rename(&tmp, path)
+    })();
+    if let Err(e) = write_result {
+        let _ = fs::remove_file(&tmp);
+        return Err(io::Error::new(
+            e.kind(),
+            format!("no se pudo guardar el estado en {}: {e}", path.display()),
+        ));
+    }
     Ok(())
+}
+
+/// Persiste el estado de forma atómica. Devuelve error si falla la escritura.
+pub fn save_persisted(st: &PersistedState) -> io::Result<()> {
+    write_state_atomic(&state_file()?, &serialize(st))
 }
 
 /// Persiste color base y porcentaje (conserva modo/power/restore).
@@ -367,7 +471,7 @@ pub fn should_restore_on_login() -> io::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::DirBuilderExt;
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
     #[test]
     fn state_migra_desde_legado() {
@@ -460,6 +564,124 @@ mod tests {
         update_brightness(|c| c.saturating_add(10), false).unwrap();
         assert_eq!(load_persisted().unwrap().brightness, 70);
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn kbc12_corrupcion_y_esquema_futuro_conservan_original() {
+        let _env = crate::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tmp = PathBuf::from(format!(
+            "/tmp/keybackcon-state-kbc12-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        let dir = tmp.join("keybackcon");
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("state");
+        let trunc = "schema_version=1\nbase_color=\nbrightness=40\n";
+        fs::write(&path, trunc).unwrap();
+        unsafe {
+            std::env::set_var("XDG_STATE_HOME", &tmp);
+        }
+        let err = load_persisted().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData, "{err}");
+        assert!(err.to_string().contains("corrupto"), "{err}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), trunc);
+
+        let future = "schema_version=99\nbase_color=112233\nbrightness=50\n";
+        fs::write(&path, future).unwrap();
+        let err = load_persisted().unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData, "{err}");
+        assert!(err.to_string().contains("schema_version=99"), "{err}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), future);
+
+        let _ = fs::remove_dir_all(&tmp);
+        unsafe {
+            std::env::remove_var("XDG_STATE_HOME");
+        }
+    }
+
+    #[test]
+    fn kbc15_temporal_exclusivo_rechaza_symlink_y_limpia_previo() {
+        let _env = crate::TEST_ENV_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tmp = PathBuf::from(format!(
+            "/tmp/keybackcon-state-kbc15-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        unsafe {
+            std::env::set_var("XDG_STATE_HOME", &tmp);
+        }
+        let st = PersistedState {
+            base_color: (1, 2, 3),
+            brightness: 42,
+            ..Default::default()
+        };
+        save_persisted(&st).unwrap();
+        let state_path = tmp.join("keybackcon/state");
+        let meta = fs::metadata(&state_path).unwrap();
+        assert_eq!(meta.permissions().mode() & 0o777, 0o600);
+
+        let tmp_path = tmp.join(format!("keybackcon/.state-{}.tmp", std::process::id()));
+        fs::write(&tmp_path, b"stale").unwrap();
+        save_persisted(&st).unwrap();
+        assert!(!tmp_path.exists());
+
+        fs::write(&tmp_path, b"x").unwrap();
+        fs::remove_file(&tmp_path).unwrap();
+        std::os::unix::fs::symlink("/tmp/keybackcon-kbc15-nowhere", &tmp_path).unwrap();
+        let err = save_persisted(&st).unwrap_err();
+        assert!(
+            err.to_string().contains("enlace") || err.kind() == io::ErrorKind::PermissionDenied,
+            "{err}"
+        );
+        let _ = fs::remove_file(&tmp_path);
+        let _ = fs::remove_dir_all(&tmp);
+        unsafe {
+            std::env::remove_var("XDG_STATE_HOME");
+        }
+    }
+
+    #[test]
+    fn kbc16_oraculo_compartido_testdata() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/state");
+        let oracle = fs::read_to_string(root.join("oracle.txt")).unwrap();
+        for line in oracle.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let mut parts = line.split_whitespace();
+            let kind = parts.next().unwrap();
+            let file = parts.next().unwrap();
+            let raw = fs::read_to_string(root.join(file)).unwrap();
+            let outcome = parse_state_text(&raw);
+            match kind {
+                "ok" => {
+                    let color = parts.next().unwrap();
+                    let brightness: u32 = parts.next().unwrap().parse().unwrap();
+                    let StateParseOutcome::Ok(st) = outcome else {
+                        panic!("{file}: esperado ok, got {outcome:?}");
+                    };
+                    assert_eq!(color::to_hex(st.base_color), color, "{file}");
+                    assert_eq!(st.brightness, brightness, "{file}");
+                }
+                "corrupt" => assert_eq!(outcome, StateParseOutcome::Corrupt, "{file}"),
+                "unsupported" => {
+                    let version: u32 = parts.next().unwrap().parse().unwrap();
+                    assert_eq!(
+                        outcome,
+                        StateParseOutcome::UnsupportedVersion(version),
+                        "{file}"
+                    );
+                }
+                other => panic!("kind desconocido {other}"),
+            }
+        }
     }
 
     #[test]

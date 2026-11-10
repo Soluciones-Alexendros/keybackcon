@@ -222,4 +222,67 @@ mod tests {
         assert!(hid_ioctl_request(HIDIOCGFEATURE_NR, 0x1_0000).is_err());
         assert!(hid_ioctl_request(HIDIOCGFEATURE_NR, usize::from(u16::MAX)).is_err());
     }
+
+    /// Oráculo UAPI Linux independiente de las constantes del crate (PRO-06 /
+    /// TEST-03). Valores tomados de `include/uapi/asm-generic/ioctl.h` y
+    /// `include/uapi/linux/hidraw.h` (`x86_64` / `aarch64` usan el genérico).
+    ///
+    /// No reutiliza `HID_IOCTL_*` del módulo bajo prueba: si esas constantes
+    /// se desalinean del kernel, este test falla.
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    mod uapi_oracle {
+        use super::super::{hid_ioctl_request, HIDIOCGFEATURE_NR, HIDIOCSFEATURE_NR};
+
+        // asm-generic/ioctl.h
+        const IOC_NRBITS: u32 = 8;
+        const IOC_TYPEBITS: u32 = 8;
+        const IOC_SIZEBITS: u32 = 14;
+        const IOC_NRSHIFT: u32 = 0;
+        const IOC_TYPESHIFT: u32 = IOC_NRSHIFT + IOC_NRBITS;
+        const IOC_SIZESHIFT: u32 = IOC_TYPESHIFT + IOC_TYPEBITS;
+        const IOC_DIRSHIFT: u32 = IOC_SIZESHIFT + IOC_SIZEBITS;
+        const IOC_WRITE: u32 = 1;
+        const IOC_READ: u32 = 2;
+
+        fn ioc(dir: u32, type_: u32, nr: u32, size: u32) -> u64 {
+            u64::from(
+                (dir << IOC_DIRSHIFT)
+                    | (type_ << IOC_TYPESHIFT)
+                    | (nr << IOC_NRSHIFT)
+                    | (size << IOC_SIZESHIFT),
+            )
+        }
+
+        /// Equivalente a `HIDIOCGFEATURE(len)` / `HIDIOCSFEATURE(len)` del UAPI.
+        fn hid_ioc_feature(nr: u32, len: u32) -> u64 {
+            ioc(IOC_READ | IOC_WRITE, u32::from(b'H'), nr, len)
+        }
+
+        #[test]
+        fn hid_ioctl_request_coincide_con_oraculo_uapi() {
+            assert_eq!(std::mem::size_of::<u64>(), 8);
+            for len in [1u32, 2, 10, 23, 256, 0x3FFF] {
+                let g = hid_ioctl_request(HIDIOCGFEATURE_NR, len as usize).unwrap();
+                let s = hid_ioctl_request(HIDIOCSFEATURE_NR, len as usize).unwrap();
+                assert_eq!(g, hid_ioc_feature(0x07, len), "HIDIOCGFEATURE({len})");
+                assert_eq!(s, hid_ioc_feature(0x06, len), "HIDIOCSFEATURE({len})");
+                // El request ioctl clásico cabe en 32 bits.
+                assert!(u32::try_from(g).is_ok());
+                assert!(u32::try_from(s).is_ok());
+            }
+            // Vectores ancla conocidos del UAPI genérico.
+            assert_eq!(hid_ioc_feature(0x07, 23), 0xc017_4807);
+            assert_eq!(hid_ioc_feature(0x06, 10), 0xc00a_4806);
+        }
+    }
+
+    /// Targets sin ABI genérica acreditada: el oráculo no aplica (PRO-06).
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[test]
+    fn hid_ioctl_request_target_sin_oraculo_uapi() {
+        // Documenta la brecha: no fallar CI en arches experimentales, pero
+        // deja constancia explícita de que PRO-06 no acredita este target.
+        let arch = std::env::consts::ARCH;
+        eprintln!("PRO-06: target {arch} sin oráculo UAPI genérico acreditado");
+    }
 }

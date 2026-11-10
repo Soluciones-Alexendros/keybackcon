@@ -89,10 +89,12 @@ parser manual sin dependencias: `parse(&[String])` valida y `run()` despacha
 a `cmd_info/cmd_set/cmd_off/cmd_brightness/cmd_firmware_effects/
 cmd_animation/cmd_stop/cmd_restore`; `usage()` conserva texto y `exit 2`.
 Comandos `info [--json]/set/off/brightness|bright/firmware-effects|auto/
-animation|anim/stop/restore`, `--help/--version`. `info --json` imprime una
-línea `{"version","device","lamps","kind","state","brightness"}` estable para
-la GUI (el formato humano no es API). El parser rechaza argumentos extra y
-`--fps` no numérico. Todo lo que cambia el color detiene primero la
+animation|anim/stop/restore`, `--help/--version`. `info` consulta el HID
+antes que el estado XDG: un fallo de preferencias no oculta el dispositivo
+(informe parcial con `preference_error` en JSON). `info --json` imprime una
+línea `{"version","device","lamps","kind","state","brightness",…}` estable
+para la GUI (el formato humano no es API). El parser rechaza argumentos
+extra y `--fps` no numérico. Todo lo que cambia el color detiene primero la
 animación: una sola escritora, nunca "teclado loco".
 
 ### `error.rs` — errores del CLI

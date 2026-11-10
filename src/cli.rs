@@ -270,35 +270,82 @@ pub fn run() -> Result<(), Error> {
     }
 }
 
+/// CLI-06: el hardware se consulta antes que las preferencias. Un fallo de
+/// XDG/estado no debe impedir el diagnóstico del dispositivo; el informe
+/// parcial deja explícito que faltan preferencias.
 fn cmd_info(json: bool) -> Result<(), Error> {
-    let st = state::load_persisted()?;
     let path = Lamp::find()?;
     let mut l = Lamp::open()?;
     let (count, kind) = l.attrs()?;
-    let hex = color::to_hex(st.base_color);
-    if json {
-        println!(
-            "{{\"version\":\"{}\",\"device\":\"{}\",\"lamps\":{count},\"kind\":{kind},\
-             \"state\":\"{hex}\",\"brightness\":{},\"power\":\"{}\",\"mode\":\"{}\",\
-             \"state_origin\":\"persisted_preference\",\
-             \"brightness_origin\":\"persisted_preference\"}}",
-            env!("CARGO_PKG_VERSION"),
-            json_escape(&path.to_string_lossy()),
-            st.brightness,
-            json_escape(&st.power),
-            json_escape(&st.mode),
-        );
-        return Ok(());
-    }
-    println!("dispositivo : {}", path.display());
-    println!("nº lámparas : {count}");
-    println!("tipo        : {kind} (lo que declara el firmware; en este modelo es engañoso)");
-    println!(
-        "preferencia : #{hex} @ %{} (no es una medición física)",
-        st.brightness
+    let prefs = state::load_persisted();
+    print!(
+        "{}",
+        format_info_report(&path, count, kind, prefs.as_ref(), json)
     );
-    println!("modo        : {} · power={}", st.mode, st.power);
     Ok(())
+}
+
+/// Formatea `info` / `info --json` a partir de HW ya leído y prefs opcionales.
+///
+/// Separado de `cmd_info` para poder fijar el fallo parcial sin hardware.
+fn format_info_report(
+    path: &std::path::Path,
+    count: u16,
+    kind: u32,
+    prefs: Result<&state::PersistedState, &io::Error>,
+    json: bool,
+) -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    let device = path.to_string_lossy();
+    match prefs {
+        Ok(st) => {
+            let hex = color::to_hex(st.base_color);
+            if json {
+                format!(
+                    "{{\"version\":\"{version}\",\"device\":\"{}\",\"lamps\":{count},\"kind\":{kind},\
+                     \"state\":\"{hex}\",\"brightness\":{},\"power\":\"{}\",\"mode\":\"{}\",\
+                     \"state_origin\":\"persisted_preference\",\
+                     \"brightness_origin\":\"persisted_preference\"}}\n",
+                    json_escape(&device),
+                    st.brightness,
+                    json_escape(&st.power),
+                    json_escape(&st.mode),
+                )
+            } else {
+                format!(
+                    "dispositivo : {}\n\
+                     nº lámparas : {count}\n\
+                     tipo        : {kind} (lo que declara el firmware; en este modelo es engañoso)\n\
+                     preferencia : #{hex} @ %{} (no es una medición física)\n\
+                     modo        : {} · power={}\n",
+                    path.display(),
+                    st.brightness,
+                    st.mode,
+                    st.power,
+                )
+            }
+        }
+        Err(e) => {
+            if json {
+                format!(
+                    "{{\"version\":\"{version}\",\"device\":\"{}\",\"lamps\":{count},\"kind\":{kind},\
+                     \"state\":null,\"brightness\":null,\"power\":null,\"mode\":null,\
+                     \"state_origin\":\"unavailable\",\"brightness_origin\":\"unavailable\",\
+                     \"preference_error\":\"{}\"}}\n",
+                    json_escape(&device),
+                    json_escape(&e.to_string()),
+                )
+            } else {
+                format!(
+                    "dispositivo : {}\n\
+                     nº lámparas : {count}\n\
+                     tipo        : {kind} (lo que declara el firmware; en este modelo es engañoso)\n\
+                     preferencia : no disponible ({e})\n",
+                    path.display(),
+                )
+            }
+        }
+    }
 }
 
 /// Escapa un texto para incrustarlo entre comillas en JSON (sin dependencias).
@@ -908,6 +955,39 @@ mod tests {
             parse(&args(&["brightness", "50", "x"])),
             Err(Error::Usage)
         ));
+    }
+
+    /// CLI-06: un error de preferencias no oculta el hardware ya consultado.
+    #[test]
+    fn info_parcial_cuando_prefs_fallan() {
+        let path = std::path::Path::new("/dev/hidraw0");
+        let prefs_err = io::Error::new(io::ErrorKind::PermissionDenied, "xdg ilegible");
+        let human = format_info_report(path, 5, 1, Err(&prefs_err), false);
+        assert!(human.contains("dispositivo : /dev/hidraw0"));
+        assert!(human.contains("nº lámparas : 5"));
+        assert!(human.contains("preferencia : no disponible"));
+        assert!(human.contains("xdg ilegible"));
+        assert!(!human.contains("modo"));
+
+        let json = format_info_report(path, 5, 1, Err(&prefs_err), true);
+        assert!(json.contains("\"device\":\"/dev/hidraw0\""));
+        assert!(json.contains("\"lamps\":5"));
+        assert!(json.contains("\"state\":null"));
+        assert!(json.contains("\"state_origin\":\"unavailable\""));
+        assert!(json.contains("\"preference_error\":\"xdg ilegible\""));
+
+        let st = state::PersistedState {
+            base_color: (255, 100, 0),
+            brightness: 40,
+            power: "on".into(),
+            mode: "fijar".into(),
+            ..Default::default()
+        };
+        let full = format_info_report(path, 5, 1, Ok(&st), true);
+        assert!(full.contains("\"state\":\"ff6400\""));
+        assert!(full.contains("\"brightness\":40"));
+        assert!(full.contains("\"state_origin\":\"persisted_preference\""));
+        assert!(!full.contains("preference_error"));
     }
 
     #[test]
