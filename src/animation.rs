@@ -197,6 +197,29 @@ fn same_validated_process(target: ValidatedAnim) -> bool {
     validate_animation_pid(target.pid) == Some(target)
 }
 
+/// Reintenta validación breve si `/proc/<pid>/exe` ya es conocido pero
+/// `cmdline` aún está vacío tras el `exec` (carrera observada en CI/tests).
+fn validate_animation_pid_ready(pid: i32) -> Option<ValidatedAnim> {
+    if let Some(v) = validate_animation_pid(pid) {
+        return Some(v);
+    }
+    let exe_known = read_exe_basename(pid).is_some_and(|b| is_known_anim_basename(&b));
+    if !exe_known || !pid_exists(pid) || pid_is_zombie(pid) {
+        return None;
+    }
+    let deadline = Instant::now() + Duration::from_millis(100);
+    while Instant::now() < deadline {
+        if let Some(v) = validate_animation_pid(pid) {
+            return Some(v);
+        }
+        if !pid_exists(pid) || pid_is_zombie(pid) {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    validate_animation_pid(pid)
+}
+
 fn pid_alive_validated_at(path: &Path) -> Option<ValidatedAnim> {
     let Some(pid) = read_pid(path) else {
         let _ = fs::remove_file(path);
@@ -204,7 +227,7 @@ fn pid_alive_validated_at(path: &Path) -> Option<ValidatedAnim> {
     };
     // Preferimos /proc a kill(0): algunos entornos (sandbox de CI/agente)
     // bloquean señales aunque el proceso sea visible en /proc.
-    if let Some(v) = validate_animation_pid(pid) {
+    if let Some(v) = validate_animation_pid_ready(pid) {
         Some(v)
     } else {
         let _ = fs::remove_file(path);
@@ -605,10 +628,13 @@ mod tests {
     }
 
     fn wait_exe_basename(pid: u32, expected: &str) {
+        let pid_i = pid.cast_signed();
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            let ok = read_exe_basename(pid.cast_signed()).as_deref() == Some(expected);
-            if ok {
+            // Exige exe y argv0: cmdline puede ir vacío un instante tras exec.
+            let exe_ok = read_exe_basename(pid_i).as_deref() == Some(expected);
+            let argv_ok = read_argv0_basename(pid_i).as_deref() == Some(expected);
+            if exe_ok && argv_ok {
                 return;
             }
             assert!(Instant::now() < deadline, "el hijo {expected} no arrancó");
