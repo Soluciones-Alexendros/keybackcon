@@ -1,11 +1,5 @@
 # Desarrollo
 
-### Propósito de este documento
-
-- **Objetivos:** Arrancar el repo en local, pasar la fachada `make` y saber qué documento actualizar según el tipo de cambio.
-- **Estructura:** Checklist → calidad (lints, rustdoc, benches) → empaquetado y release → dónde documentar.
-- **Contenido a integrar según contexto:** Adapta Cargo, GUI GTK y scripts de este repo. No copies un setup npm/pnpm ni crates de HID ajenos. Un cambio de protocolo o de dependencias exige ADR en [`../architecture/decisions/DECISIONS.md`](../architecture/decisions/DECISIONS.md).
-
 Checklist ejecutable (en orden; la fachada es `make validate`):
 
 - [ ] `make lint` — fmt, clippy `--all-targets -D warnings`, rustdoc, `py_compile` de `gui/*.py`
@@ -73,6 +67,21 @@ con `GITHUB_TOKEN` no encadenaría workflows). Si falta `RELEASE_PAT`, el
 workflow termina en verde con un notice y no publica. El workflow de release
 verifica que el tag coincida con las tres fuentes. Los commits `chore` no
 bumpan (`skip` en `cliff.toml`).
+Si la GUI no puede importar el paquete, el fallback de versión es
+`desconocida` (nunca una cifra antigua inventada).
+
+## Bootstrap de la GUI (instalado vs checkout)
+
+Contrato único en `gui/__init__.py`:
+
+1. Los entrypoints llaman a `ensure_package` / `api(__file__)` para que
+   `import gui` funcione tanto con el paquete instalado como con
+   `python3 gui/main.py` suelto.
+2. Los módulos hermanos obtienen `load`, `log_exc` y `gettext_func` vía
+   `api(...)`; no reimplementan import/gettext/logging locales.
+3. `app_version()` espeja `Cargo.toml`; `UNKNOWN_VERSION` solo si falla la
+   importación del paquete.
+
 
 ## Empaquetado y release
 

@@ -1,11 +1,5 @@
 # Guía: calidad y jobs de CI
 
-### Propósito de este documento
-
-- **Objetivos:** Fijar qué significa cada job del pipeline principal y cómo se mide la calidad sin inventar un gate de cobertura frágil.
-- **Estructura:** Jobs `quality` / `test` / `build` / `smoke` → MSRV y release → cobertura.
-- **Contenido a integrar según contexto:** Adapta Cargo y `scripts/smoke.sh` de este repo. No copies gates Vitest/Playwright de otro paquete. El job `msrv` y `release.yml` no se renombran.
-
 ## Jobs del pipeline principal
 
 | Job | Qué hace |

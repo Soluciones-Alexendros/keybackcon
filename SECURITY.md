@@ -1,11 +1,5 @@
 # Política de seguridad
 
-### Propósito de este documento
-
-- **Objetivos:** Declarar versiones soportadas, el canal privado de avisos y la superficie HID/udev/pkexec.
-- **Estructura:** Versiones soportadas → cómo reportar → superficie relevante → alcance (CLI local, no SaaS).
-- **Contenido a integrar según contexto:** Adapta versiones de `Cargo.toml`. No copies la política de un SaaS. No commitees dumps hidraw con datos ajenos ni claves.
-
 ## Versiones soportadas
 
 | Versión        | Soportada                          |

@@ -1,11 +1,7 @@
 # Contrato funcional de estado y sesión
 
-### Propósito de este documento
-
-- **Objetivos:** Fijar el comportamiento esperado de brillo, apagado,
   restauración, consultas y clientes (CLI, ventana, bandeja).
 - **Estructura:** Preferencias vs aplicación → comandos → sesión → JSON.
-- **Contenido a integrar según contexto:** Cualquier cambio de semántica
   exige actualizar este archivo y las pruebas asociadas.
 
 ## Distinciones

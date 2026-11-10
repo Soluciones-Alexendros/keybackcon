@@ -1,11 +1,5 @@
 # Keyboard Backlight Controls (`keybackcon`)
 
-### Propósito de este documento
-
-- **Objetivos:** Explicar qué es keybackcon, cómo instalarlo y los comandos de la CLI/GUI sin sustituir la spec HID ni los ADR.
-- **Estructura:** Instalación → uso → cómo funciona → problemas típicos → desarrollo y contratos.
-- **Contenido a integrar según contexto:** Adapta comandos y empaquetado de este repo. No copies un README de SaaS. El detalle HID está en [`docs/architecture/protocol.md`](docs/architecture/protocol.md); no lo dupliques aquí.
-
 [![CI](https://github.com/Soluciones-Alexendros/keybackcon/actions/workflows/ci.yml/badge.svg)](https://github.com/Soluciones-Alexendros/keybackcon/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Soluciones-Alexendros/keybackcon)](https://github.com/Soluciones-Alexendros/keybackcon/releases)
 ![Rust](https://img.shields.io/badge/rust-sin%20dependencias-orange)
