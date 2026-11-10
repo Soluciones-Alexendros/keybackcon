@@ -1,12 +1,8 @@
 # Matriz de compatibilidad
 
-### Propósito de este documento
-
-- **Objetivos:** Declarar qué combinaciones de distribución, GUI, sesión y
   arquitectura están verificadas, candidatas o fuera de alcance.
 - **Estructura:** Ejes → distribuciones → bibliotecas gráficas → arquitecturas
   → Hyprland → estados.
-- **Contenido a integrar según contexto:** Actualizar solo tras pruebas
   registradas. No anunciar un canal como instalable sin evidencia.
 
 Estados: **probado** (evidencia en commit/artefacto), **candidato** (objetivo

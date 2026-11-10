@@ -1,11 +1,5 @@
 # Arquitectura
 
-### Propósito de este documento
-
-- **Objetivos:** Describir capas, fronteras CLI/GUI y flujos HID para que un cambio no rompa el protocolo, el pidfile ni la identidad de cero dependencias.
-- **Estructura:** Diagrama → módulos `src/` → GUI → flujos.
-- **Contenido a integrar según contexto:** Adapta módulos de este crate. No copies una arquitectura de SaaS ni crates de HID ajenos. El protocolo vive en [`docs/architecture/protocol.md`](docs/architecture/protocol.md); los ADR en [`docs/architecture/decisions/DECISIONS.md`](docs/architecture/decisions/DECISIONS.md). No añadas dependencias Cargo sin ADR.
-
 `keybackcon` habla directamente con el teclado vía hidraw, sin demonios ni dependencias.
 
 ```
@@ -13,7 +7,9 @@
 │ keybackcon   │  ──────────────────────────────────────▶  │ /dev/hidrawN│
 │ (Rust, 0 deps)│   LampArray, Usage Page 0x59, reportes    │ AERO X16    │
 └──────────────┘   1/5/6: atributos, color, autónomo       └────────────┘
-       │ state: ~/.local/state/keybackcon/state  ("ff7800 60")
+       │ state versionado: $XDG_STATE_HOME/keybackcon/state
+       │   (+ state.lock RMW; lectura heredada plana / kbd-rgb)
+       │ writer.lock: /run/keybackcon/writer.lock (flock HID)
        │ pidfile: $XDG_RUNTIME_DIR/keybackcon/animation.pid
        ▼
 ┌──────────────┐   subprocess: set / brightness / animation / stop
@@ -52,12 +48,19 @@ errores nombran operación y ruta. `attrs()` (LampCount), `autonomous(on)`
 firmware declara `IntensityLevelCount=1`, no hay canal de brillo), `hsv`,
 `to_hex`.
 
-### `state.rs` — estado persistente
+### `state.rs` — estado persistente versionado
 
-`state_file()` nuevo (`keybackcon/state`) con lectura heredada
-(`kbd-rgb/state`); `load_state` tolerante, `save_state` atómica
-(fichero temporal + `rename`, avisa en stderr si falla), `apply` (apaga
-autónomo → color → persiste).
+Formato canónico (`SCHEMA_VERSION = 1`) en
+`$XDG_STATE_HOME/keybackcon/state` (claves `schema_version`, `base_color`,
+`brightness`, `power`, `mode`, `restore_policy`). Lectura heredada del
+plano `"<hex> <pct>"` y de `kbd-rgb/state`. Las actualizaciones RMW
+(brillo, modo) toman un `flock` breve sobre `state.lock` (no se mantiene
+durante el bucle de animación). El id de ejecución vive en
+`$XDG_RUNTIME_DIR/keybackcon/animation.run` para que una limpieza obsoleta
+no pise un `off` nuevo. `load_state` / `save_state` / `apply` /
+`set_runtime_mode` / `begin_animation_mode` / `end_animation_mode` son la
+API; el contrato de sesión está en
+[`docs/product/contrato.md`](docs/product/contrato.md).
 
 ### `animation.rs` — animación exclusiva y parada limpia
 
