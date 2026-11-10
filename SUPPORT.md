@@ -1,11 +1,5 @@
 # Soporte — keybackcon
 
-### Propósito de este documento
-
-- **Objetivos:** Orientar a quien abre un issue o pide ayuda: docs, plantillas, seguridad y contacto.
-- **Estructura:** Documentación → issues → vulnerabilidades → contacto → tiempos.
-- **Contenido a integrar según contexto:** Adapta URLs a este CLI/GUI HID. No copies un desk de SaaS con SLA de producto.
-
 Antes de abrir un issue revisa estas vías.
 
 ## 1. Documentación

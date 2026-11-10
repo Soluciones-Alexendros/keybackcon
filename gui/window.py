@@ -10,22 +10,17 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gdk
 
 try:
-    from gui import load, log_exc, gettext_func
+    from gui import api
 except ImportError:  # ejecución directa: gui/ en sys.path
-    import importlib
     import sys
 
-    def load(nombre):
-        return importlib.import_module(nombre)
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(_here)
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from gui import api
 
-    def gettext_func():
-        mod = importlib.import_module("i18n")
-        return mod._
-
-    def log_exc(contexto):
-        tipo, exc, _tb = sys.exc_info()
-        print(f"keybackcon-gui: {contexto}: {tipo.__name__}: {exc}",
-              file=sys.stderr)
+load, log_exc, gettext_func = api(__file__)
 
 _client_mod = load("client")
 KeybackconClient = _client_mod.KeybackconClient

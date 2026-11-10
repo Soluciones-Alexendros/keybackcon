@@ -17,19 +17,19 @@ except ImportError:  # tests sin GI
     GLib = None  # type: ignore
 
 try:
-    from gui import log_exc
-    from gui.i18n import _
+    from gui import api
 except ImportError:
-    try:
-        from i18n import _
-    except ImportError:
-        def _(s):
-            return s
+    import os
+    import sys
 
-    def log_exc(contexto):
-        import sys
-        tipo, exc, _tb = sys.exc_info()
-        print(f"keybackcon-gui: {contexto}: {tipo.__name__}: {exc}", file=sys.stderr)
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(_here)
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from gui import api
+
+_load, log_exc, _gettext_func = api(__file__)
+_ = _gettext_func()
 
 
 @dataclass(frozen=True)

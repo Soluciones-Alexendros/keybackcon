@@ -1,29 +1,27 @@
 # Hoja de ruta
 
-### Propósito de este documento
-
-- **Objetivos:** Dejar visible qué está hecho y qué queda, ordenado por horizonte (en curso → corto → medio → largo → histórico).
-- **Estructura:** Horizontes con objetivos marcables y lista de hitos logrados al final.
-- **Contenido a integrar según contexto:** No copies un roadmap de otro producto. Los ADR y el protocolo no se mueven a este archivo.
-
 Próximos objetivos, ordenados por horizonte. Un objetivo solo entra aquí
 cuando está listo para trabajar (criterio claro) o bloqueado (se indica por
 qué). Los hitos ya logrados van al final como histórico.
 
 ## En curso
 
-Nada listo para trabajar. v2.5.0 está en `main`, en GitHub Releases y en
-npm. El versionado etiqueta desde el mismo job que abre el PR, porque el
-merge del bot no vuelve a disparar el workflow.
+- [ ] **Estabilización post-auditoría (2026-11-10)** — lotes P1/P2 en vuelo
+      (permisos/candado, estado concurrente, GUI async, CI gráfico, identidad
+      de procesos, docs). Criterio: hallazgos canónicos con PR mergeado y
+      evidencia de prueba; no declarar «sin bloqueos» mientras queden P1
+      abiertos. Trazas en el registro Notion de hallazgos/correcciones.
+- [ ] **v2.5.0 publicada** — ya en `main`, GitHub Releases y npm; el
+      versionado etiqueta desde el job que abre el PR de release.
 
 ## Corto plazo
 
-- [ ] **Publicar en AUR** — el `PKGBUILD` está listo; falta rellenar
-      `sha256sums` reales (`updpkgsums`), generar `.SRCINFO`
-      (`makepkg --printsrcinfo`) y subir con cuenta AUR. Bloqueado: cuenta.
-- [ ] **Prueba de `npm install -g` en máquina limpia** — v2.4.1 ya está en
-      el registry. Falta instalarlo en un Debian y un Arch vacíos y
-      comprobar el postinstalador.
+- [ ] **Cerrar deuda documental y de empaquetado menor** — AUR (`sha256sums`
+      + `.SRCINFO` + cuenta), prueba de `npm install -g` en Debian/Arch
+      limpios, y hallazgos docs/CI P2 restantes con criterio de aceptación.
+- [ ] **Decisiones de contrato pendientes** — ítems clasificados como
+      decisión (CLI/restore multi-autoridad, etc.) no se implementan hasta
+      ADR o ratificación explícita.
 
 ## Medio plazo
 
@@ -32,7 +30,7 @@ merge del bot no vuelve a disparar el workflow.
       que documentarlo. Decisión pendiente según demanda.
 - [ ] **Más teclados** — hacer configurables la firma del descriptor HID y
       la regla udev (VID/PID) vía variable de entorno o flag, si aparece
-      demanda de otros modelos LampArray.
+      demanda de otros modelos LampArray. Requiere Fase 5 / hardware.
 
 ## Largo plazo / condicionado
 

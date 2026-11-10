@@ -5,21 +5,18 @@ import signal
 import subprocess
 
 try:
-    from gui import log_exc
-    from gui.i18n import _
+    from gui import api
 except ImportError:  # ejecución directa: gui/ en sys.path
-    try:
-        from i18n import _
-    except ImportError:
-        def _(s):
-            return s
+    import sys
 
-    def log_exc(contexto):
-        import sys
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(_here)
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from gui import api
 
-        tipo, exc, _tb = sys.exc_info()
-        print(f"keybackcon-gui: {contexto}: {tipo.__name__}: {exc}",
-              file=sys.stderr)
+_load, log_exc, _gettext_func = api(__file__)
+_ = _gettext_func()
 
 
 def find_binary():

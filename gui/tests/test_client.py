@@ -167,7 +167,7 @@ class TestRunErrores(unittest.TestCase):
 
 class TestInfoJson(unittest.TestCase):
     def test_json_valido(self):
-        datos = {"version": "2.2.1", "lamps": 1, "state": "00ffff", "brightness": 95}
+        datos = {"version": "2.5.0", "lamps": 1, "state": "00ffff", "brightness": 95}
         fake = BinarioFake('#!/bin/sh\necho \'%s\'\n' % json.dumps(datos))
         cliente = KeybackconClient(binary=fake.ruta)
         self.assertEqual(cliente.info(), datos)
