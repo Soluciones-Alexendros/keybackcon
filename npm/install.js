@@ -118,8 +118,16 @@ function installSystemdUnits(bin) {
   }
   const dir = path.join(os.homedir(), '.config', 'systemd', 'user');
   fs.mkdirSync(dir, { recursive: true });
+  // Preferencia previa: no reactivar si el usuario deshabilitó o enmascaró
+  // (mismo contrato que scripts/install.sh H-26/H-27 / KBC-10).
+  const prevEnableResult = spawnSync(
+    'systemctl',
+    ['--user', 'is-enabled', 'keybackcon.service'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+  );
+  const prevEnable = (prevEnableResult.stdout || '').trim();
+  const hadUnit = fs.existsSync(path.join(dir, 'keybackcon.service'));
   const units = ['keybackcon.service', 'keybackcon-animation@.service'];
-  let anyNew = false;
   for (const unit of units) {
     const tmpl = fs.readFileSync(path.join(ROOT, 'systemd', unit), 'utf8');
     const rendered = tmpl.split('__KEYBACKCON_BIN__').join(bin);
@@ -127,14 +135,22 @@ function installSystemdUnits(bin) {
     const existing = fs.existsSync(dest) ? fs.readFileSync(dest, 'utf8') : null;
     if (existing !== rendered) {
       fs.writeFileSync(dest, rendered);
-      anyNew = true;
       log(`unidad ${unit} instalada en ~/.config/systemd/user`);
     }
   }
   run('systemctl', ['--user', 'daemon-reload']);
   const enable = path.join(dir, 'keybackcon.service');
-  if (anyNew && fs.existsSync(enable)) {
-    // Solo si la unidad es nueva (no existe estado previo del usuario).
+  if (!fs.existsSync(enable)) return;
+  if (prevEnable === 'disabled' || prevEnable === 'masked') {
+    log(`restauración ${prevEnable}; no se reactiva`);
+    return;
+  }
+  if (prevEnable === 'enabled' || prevEnable === 'enabled-runtime') {
+    return;
+  }
+  // Alta nueva o estado no-disabled/masked: enable si no había unidad o se fuerza.
+  const forceEnable = process.env.KEYBACKCON_ENABLE_RESTORE === '1';
+  if (!hadUnit || forceEnable) {
     run('systemctl', ['--user', 'enable', 'keybackcon.service']);
     log('restauración al login habilitada (systemctl --user enable keybackcon.service)');
   }
@@ -155,4 +171,14 @@ function main() {
   log('listo. Prueba con: keybackcon info');
 }
 
-main();
+module.exports = {
+  installSystemdUnits,
+  resolveBinary,
+  installUdev,
+  installWriterLock,
+  main,
+};
+
+if (require.main === module) {
+  main();
+}
