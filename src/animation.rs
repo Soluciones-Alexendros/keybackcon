@@ -751,11 +751,10 @@ mod tests {
         assert_eq!(
             got,
             Some(legacy_pid),
-            "KBC-06: kbd-rgb legado real (basename exacto) se acepta; exe={:?} argv0={:?} uid={:?}/{}",
+            "KBC-06: kbd-rgb legado real (basename exacto) se acepta; exe={:?} argv0={:?} uid_match={}",
             read_exe_basename(legacy_pid),
             read_argv0_basename(legacy_pid),
-            read_real_uid(legacy_pid),
-            self_uid()
+            read_real_uid(legacy_pid) == Some(self_uid())
         );
         let _ = legacy.kill();
         let _ = legacy.wait();
