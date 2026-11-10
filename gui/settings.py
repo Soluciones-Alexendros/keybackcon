@@ -376,9 +376,20 @@ if Adw is not None:
             return False
 
         def _on_restore_now(self, _row):
+            # KBC-08: no bloquear el hilo gráfico con restore síncrono.
+            if self._client is None:
+                return
+            client = self._client
+
+            def work():
+                try:
+                    client.restore()
+                except Exception:
+                    log_exc("restaurar ahora")
+
             try:
-                if self._client is None:
-                    return
-                self._client.restore()
+                threading.Thread(
+                    target=work, name="keybackcon-restore", daemon=True
+                ).start()
             except Exception:
-                log_exc("restaurar ahora")
+                log_exc("lanzar restore")
