@@ -6,6 +6,7 @@
 
 use std::fs;
 use std::io::{self, Write};
+use std::os::fd::{FromRawFd, OwnedFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -16,16 +17,34 @@ use crate::state;
 use crate::writer::WriterGuard;
 use crate::xdg;
 
-// SAFETY: signal y kill son libc con ABI estable.
+// SAFETY: signal/kill/getuid/syscall son libc con ABI estable en Linux.
 unsafe extern "C" {
     fn signal(signum: i32, handler: extern "C" fn(i32)) -> usize;
     fn kill(pid: i32, sig: i32) -> i32;
+    fn getuid() -> u32;
+    fn syscall(num: i64, ...) -> i64;
 }
 
 const SIGINT: i32 = 2;
 const SIGTERM: i32 = 15;
 /// Máximo de fotogramas por segundo.
 pub const MAX_FPS: u64 = 60;
+
+/// Binarios de animación reconocidos (basename exacto de `/proc/<pid>/exe` y argv0).
+const KNOWN_ANIM_BASENAMES: &[&str] = &["keybackcon", "kbd-rgb"];
+
+/// Syscalls `pidfd_open` / `pidfd_send_signal` (Linux; mismos nº en `x86_64` y `aarch64`).
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+const SYS_PIDFD_SEND_SIGNAL: i64 = 424;
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+const SYS_PIDFD_OPEN: i64 = 434;
+
+/// Identidad temporal de un proceso de animación validado (PID + `starttime`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ValidatedAnim {
+    pid: i32,
+    starttime: u64,
+}
 
 static STOP: AtomicBool = AtomicBool::new(false);
 
@@ -106,37 +125,136 @@ fn pid_exists(pid: i32) -> bool {
     Path::new(&format!("/proc/{pid}")).exists()
 }
 
-fn pid_alive_at(path: &Path) -> Option<i32> {
+fn path_basename(s: &str) -> &str {
+    Path::new(s)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(s)
+}
+
+fn is_known_anim_basename(name: &str) -> bool {
+    KNOWN_ANIM_BASENAMES.contains(&name)
+}
+
+fn read_starttime(pid: i32) -> Option<u64> {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let rest = stat.rsplit_once(')')?.1;
+    // Campo 22 (starttime): tras `)` el índice 0 es state → starttime = 22 - 3 = 19.
+    rest.split_whitespace().nth(19)?.parse().ok()
+}
+
+fn read_real_uid(pid: i32) -> Option<u32> {
+    let status = fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    for line in status.lines() {
+        let Some(rest) = line.strip_prefix("Uid:") else {
+            continue;
+        };
+        return rest.split_whitespace().next()?.parse().ok();
+    }
+    None
+}
+
+fn self_uid() -> u32 {
+    // SAFETY: getuid no tiene efectos laterales.
+    unsafe { getuid() }
+}
+
+fn read_exe_basename(pid: i32) -> Option<String> {
+    let link = fs::read_link(format!("/proc/{pid}/exe")).ok()?;
+    link.file_name().map(|n| n.to_string_lossy().into_owned())
+}
+
+fn read_argv0_basename(pid: i32) -> Option<String> {
+    let raw = fs::read(format!("/proc/{pid}/cmdline")).ok()?;
+    let first = raw.split(|&b| b == 0).next().filter(|s| !s.is_empty())?;
+    let argv0 = std::str::from_utf8(first).ok()?;
+    Some(path_basename(argv0).to_string())
+}
+
+/// Verifica ejecutable, argv0, propietario e identidad temporal (KBC-06).
+/// Rechaza subcadenas incidentales (`decoy-keybackcon-tool`); acepta el
+/// binario legado real `kbd-rgb` solo por basename exacto de exe/argv0.
+fn validate_animation_pid(pid: i32) -> Option<ValidatedAnim> {
+    if !pid_exists(pid) || pid_is_zombie(pid) {
+        return None;
+    }
+    if read_real_uid(pid)? != self_uid() {
+        return None;
+    }
+    let exe = read_exe_basename(pid)?;
+    if !is_known_anim_basename(&exe) {
+        return None;
+    }
+    let argv0 = read_argv0_basename(pid)?;
+    if !is_known_anim_basename(&argv0) {
+        return None;
+    }
+    let starttime = read_starttime(pid)?;
+    Some(ValidatedAnim { pid, starttime })
+}
+
+fn same_validated_process(target: ValidatedAnim) -> bool {
+    validate_animation_pid(target.pid) == Some(target)
+}
+
+/// Reintenta validación breve si `/proc/<pid>/exe` ya es conocido pero
+/// `cmdline` aún está vacío tras el `exec` (carrera observada en CI/tests).
+fn validate_animation_pid_ready(pid: i32) -> Option<ValidatedAnim> {
+    if let Some(v) = validate_animation_pid(pid) {
+        return Some(v);
+    }
+    let exe_known = read_exe_basename(pid).is_some_and(|b| is_known_anim_basename(&b));
+    if !exe_known || !pid_exists(pid) || pid_is_zombie(pid) {
+        return None;
+    }
+    let deadline = Instant::now() + Duration::from_millis(100);
+    while Instant::now() < deadline {
+        if let Some(v) = validate_animation_pid(pid) {
+            return Some(v);
+        }
+        if !pid_exists(pid) || pid_is_zombie(pid) {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    validate_animation_pid(pid)
+}
+
+fn pid_alive_validated_at(path: &Path) -> Option<ValidatedAnim> {
     let Some(pid) = read_pid(path) else {
         let _ = fs::remove_file(path);
         return None;
     };
     // Preferimos /proc a kill(0): algunos entornos (sandbox de CI/agente)
     // bloquean señales aunque el proceso sea visible en /proc.
-    if !pid_exists(pid) || pid_is_zombie(pid) {
-        let _ = fs::remove_file(path);
-        return None;
-    }
-    let cmd = fs::read_to_string(format!("/proc/{pid}/cmdline")).unwrap_or_default();
-    if cmd.contains("keybackcon") || cmd.contains("kbd-rgb") {
-        Some(pid)
+    if let Some(v) = validate_animation_pid_ready(pid) {
+        Some(v)
     } else {
         let _ = fs::remove_file(path);
         None
     }
 }
 
-/// Devuelve el pid de una animación viva validada.
-pub fn animation_pid_alive() -> Option<i32> {
-    if let Some(pid) = pid_alive_at(&pid_file()) {
-        return Some(pid);
+#[cfg(test)]
+fn pid_alive_at(path: &Path) -> Option<i32> {
+    pid_alive_validated_at(path).map(|v| v.pid)
+}
+
+fn animation_validated_alive() -> Option<ValidatedAnim> {
+    if let Some(v) = pid_alive_validated_at(&pid_file()) {
+        return Some(v);
     }
     for legacy in legacy_pid_files() {
-        if let Some(pid) = pid_alive_at(&legacy) {
-            return Some(pid);
+        if let Some(v) = pid_alive_validated_at(&legacy) {
+            return Some(v);
         }
     }
     None
+}
+
+/// Devuelve el pid de una animación viva validada.
+pub fn animation_pid_alive() -> Option<i32> {
+    animation_validated_alive().map(|v| v.pid)
 }
 
 fn pidfile_references_keybackcon() -> bool {
@@ -148,48 +266,123 @@ fn pidfile_references_keybackcon() -> bool {
             continue;
         }
         if pid_is_zombie(pid) {
-            return true;
+            // Zombie: solo cuenta si exe/argv0 aún identifican el binario.
+            let exe_ok = read_exe_basename(pid).is_some_and(|b| is_known_anim_basename(&b));
+            let argv_ok = read_argv0_basename(pid).is_some_and(|b| is_known_anim_basename(&b));
+            if exe_ok || argv_ok {
+                return true;
+            }
+            continue;
         }
-        let cmd = fs::read_to_string(format!("/proc/{pid}/cmdline")).unwrap_or_default();
-        if cmd.contains("keybackcon") || cmd.contains("kbd-rgb") {
+        if validate_animation_pid(pid).is_some() {
             return true;
         }
     }
     false
 }
 
+fn pidfd_open(pid: i32) -> Option<OwnedFd> {
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    {
+        // SAFETY: pidfd_open(pid, 0); fd nuevo o -errno.
+        let fd = unsafe { syscall(SYS_PIDFD_OPEN, pid, 0_u32) };
+        if fd < 0 {
+            return None;
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        let raw = fd as RawFd;
+        // SAFETY: fd exclusivo de pidfd_open.
+        Some(unsafe { OwnedFd::from_raw_fd(raw) })
+    }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+fn pidfd_send_signal(pidfd: &OwnedFd, sig: i32) -> bool {
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    {
+        use std::os::fd::AsRawFd;
+        // SAFETY: pidfd_send_signal(pidfd, sig, NULL, 0).
+        let rc = unsafe {
+            syscall(
+                SYS_PIDFD_SEND_SIGNAL,
+                pidfd.as_raw_fd(),
+                sig,
+                std::ptr::null::<u8>(),
+                0_u32,
+            )
+        };
+        rc == 0
+    }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        let _ = (pidfd, sig);
+        false
+    }
+}
+
+/// Señaliza tras revalidar identidad; prefiere pidfd para acotar TOCTOU (KBC-07).
+fn signal_validated_animation(target: ValidatedAnim) -> bool {
+    if let Some(pidfd) = pidfd_open(target.pid) {
+        // Entre open y la señal el PID pudo reciclarse: revalidar starttime/exe.
+        if !same_validated_process(target) {
+            return false;
+        }
+        return pidfd_send_signal(&pidfd, SIGTERM);
+    }
+    if !same_validated_process(target) {
+        return false;
+    }
+    // SAFETY: identidad revalidada inmediatamente antes.
+    unsafe { kill(target.pid, SIGTERM) == 0 }
+}
+
+fn process_still_target(target: ValidatedAnim) -> bool {
+    if !pid_exists(target.pid) || pid_is_zombie(target.pid) {
+        return false;
+    }
+    // Si el starttime cambió, el PID se recicló: el proceso original ya no vive.
+    read_starttime(target.pid) == Some(target.starttime)
+}
+
 /// Señaliza SIGTERM y espera hasta 1 s. Si el proceso sigue vivo, no borra el
 /// pidfile y devuelve [`StopResult::SigueViva`].
 pub fn stop_animation() -> StopResult {
     let me = std::process::id().cast_signed();
-    let live = animation_pid_alive();
+    let live = animation_validated_alive();
     let had = live.is_some() || pidfile_references_keybackcon();
-    if let Some(pid) = live {
-        if pid != me {
-            // SAFETY: pid validado como keybackcon vivo distinto.
-            let signaled = unsafe { kill(pid, SIGTERM) } == 0;
-            if !signaled {
-                eprintln!(
-                    "aviso: no se pudo enviar SIGTERM a la animación (pid {pid}); \
-                     no se escribe en el dispositivo"
-                );
-                return StopResult::SigueViva;
-            }
-            let mut still_alive = true;
-            for _ in 0..20 {
-                if !pid_exists(pid) || pid_is_zombie(pid) {
-                    still_alive = false;
-                    break;
+    if let Some(target) = live {
+        if target.pid != me {
+            let signaled = signal_validated_animation(target);
+            if signaled {
+                let mut still_alive = true;
+                for _ in 0..20 {
+                    if !process_still_target(target) {
+                        still_alive = false;
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
                 }
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            if still_alive {
+                if still_alive {
+                    eprintln!(
+                        "aviso: la animación anterior (pid {}) no respondió a SIGTERM; \
+                         se conserva su bloqueo para no tener dos escritores",
+                        target.pid
+                    );
+                    return StopResult::SigueViva;
+                }
+            } else if process_still_target(target) && same_validated_process(target) {
                 eprintln!(
-                    "aviso: la animación anterior (pid {pid}) no respondió a SIGTERM; \
-                     se conserva su bloqueo para no tener dos escritores"
+                    "aviso: no se pudo enviar SIGTERM a la animación (pid {}); \
+                     no se escribe en el dispositivo",
+                    target.pid
                 );
                 return StopResult::SigueViva;
             }
+            // Si la señal falló porque el PID se recicló o murió, limpiamos pidfiles.
         }
     }
     let _ = fs::remove_file(pid_file());
@@ -339,7 +532,6 @@ pub fn run_animation(mode: &str, fps: u64) -> io::Result<()> {
 mod tests {
     use super::*;
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
-    use std::os::unix::process::CommandExt;
     use std::process::{Child, Command};
     use std::sync::MutexGuard;
 
@@ -407,14 +599,58 @@ mod tests {
         )
     }
 
-    fn live_keybackcon_child() -> Child {
-        // argv0 = "keybackcon" para que /proc/<pid>/cmdline coincida.
+    /// Copia del binario de test con basename exacto (exe + argv0).
+    /// No usamos `sleep`: en runners con rust-coreutils/uutils el multicall
+    /// muere al renombrarse (`coreutils: unknown program 'keybackcon'`).
+    /// Copiamos (no hardlink) para que `/proc/<pid>/exe` resuelva a `name`.
+    fn fixture_anim_bin(runtime: &Path, name: &str) -> PathBuf {
+        let fixtures = runtime.join("fixtures");
+        fs::create_dir_all(&fixtures).expect("crear fixtures");
+        let dest = fixtures.join(name);
+        let _ = fs::remove_file(&dest);
+        let src = std::env::current_exe().expect("current_exe");
+        fs::copy(&src, &dest).expect("copiar binario de test como fixture");
+        let mut perms = fs::metadata(&dest).expect("meta fixture").permissions();
+        perms.set_mode(perms.mode() | 0o111);
+        fs::set_permissions(&dest, perms).expect("chmod +x fixture");
+        dest
+    }
+
+    /// Hijo que solo duerme cuando el padre fija `KEYBACKCON_ANIM_FIXTURE_SLEEP`.
+    #[test]
+    fn fixture_sleep_child() {
+        let Ok(secs) = std::env::var("KEYBACKCON_ANIM_FIXTURE_SLEEP") else {
+            return;
+        };
+        let n: u64 = secs.parse().unwrap_or(1);
+        std::thread::sleep(Duration::from_secs(n));
+        std::process::exit(0);
+    }
+
+    fn live_named_child(runtime: &Path, name: &str, secs: &str) -> Child {
+        let bin = fixture_anim_bin(runtime, name);
         // Sueño corto: en sandboxes que bloquean señales no queremos esperar 60 s.
-        Command::new("sleep")
-            .arg0("keybackcon")
-            .arg("3")
+        Command::new(&bin)
+            .args(["--exact", "animation::tests::fixture_sleep_child"])
+            .env("KEYBACKCON_ANIM_FIXTURE_SLEEP", secs)
+            .env_remove("RUST_TEST_THREADS")
             .spawn()
             .unwrap()
+    }
+
+    fn wait_exe_basename(pid: u32, expected: &str) {
+        let pid_i = pid.cast_signed();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            // Exige exe y argv0: cmdline puede ir vacío un instante tras exec.
+            let exe_ok = read_exe_basename(pid_i).as_deref() == Some(expected);
+            let argv_ok = read_argv0_basename(pid_i).as_deref() == Some(expected);
+            if exe_ok && argv_ok {
+                return;
+            }
+            assert!(Instant::now() < deadline, "el hijo {expected} no arrancó");
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 
     #[test]
@@ -434,17 +670,8 @@ mod tests {
             tmp,
             "XDG_RUNTIME_DIR debe apuntar al tmp del test"
         );
-        let mut child = live_keybackcon_child();
-        let deadline = Instant::now() + Duration::from_secs(2);
-        loop {
-            let cmd =
-                fs::read_to_string(format!("/proc/{}/cmdline", child.id())).unwrap_or_default();
-            if cmd.contains("keybackcon") {
-                break;
-            }
-            assert!(Instant::now() < deadline, "el hijo no llegó a ejecutarse");
-            std::thread::sleep(Duration::from_millis(5));
-        }
+        let mut child = live_named_child(&tmp, "keybackcon", "3");
+        wait_exe_basename(child.id(), "keybackcon");
         let pf = tmp.join("keybackcon/animation.pid");
         let pid_i = child.id().cast_signed();
         fs::write(&pf, pid_i.to_string()).unwrap();
@@ -487,6 +714,71 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
     }
 
+    /// KBC-06: tras el fix, subcadena en argv0/exe no basta; decoy se rechaza.
+    /// No se llama a `stop_animation` aquí (solo `pid_alive_at`); el hijo se mata al final.
+    #[test]
+    fn kbc06_pid_alive_rechaza_cmdline_con_subcadena_ajena() {
+        let (tmp, _env) = tmp_runtime("subcadena-ajena");
+        let mut child = live_named_child(&tmp, "decoy-keybackcon-tool", "8");
+        wait_exe_basename(child.id(), "decoy-keybackcon-tool");
+        let pid = child.id().cast_signed();
+        let pf = tmp.join("keybackcon/animation.pid");
+        fs::write(&pf, pid.to_string()).unwrap();
+        assert_eq!(
+            pid_alive_at(&pf),
+            None,
+            "KBC-06: decoy-keybackcon-tool no debe pasar la identidad estricta"
+        );
+        assert!(
+            Path::new(&format!("/proc/{pid}")).exists(),
+            "el decoy sigue vivo (no se señalizó)"
+        );
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    /// KBC-06: el binario legado real `kbd-rgb` (basename exacto de exe/argv0) sí cuenta.
+    #[test]
+    fn kbc06_pid_alive_acepta_kbd_rgb_legado_exacto() {
+        let (tmp, _env) = tmp_runtime("kbd-rgb-legado");
+        let mut legacy = live_named_child(&tmp, "kbd-rgb", "8");
+        wait_exe_basename(legacy.id(), "kbd-rgb");
+        let legacy_pid = legacy.id().cast_signed();
+        let pf = tmp.join("keybackcon/animation.pid");
+        fs::write(&pf, legacy_pid.to_string()).unwrap();
+        let got = pid_alive_at(&pf);
+        assert_eq!(
+            got,
+            Some(legacy_pid),
+            "KBC-06: kbd-rgb legado real (basename exacto) se acepta; exe={:?} argv0={:?} uid_match={}",
+            read_exe_basename(legacy_pid),
+            read_argv0_basename(legacy_pid),
+            read_real_uid(legacy_pid) == Some(self_uid())
+        );
+        let _ = legacy.kill();
+        let _ = legacy.wait();
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    /// KBC-07: stop no debe SIGTERM a un proceso ajeno aunque el pidfile lo cite.
+    #[test]
+    fn kbc07_stop_no_senala_decoy_ni_ajeno() {
+        let (tmp, _env) = tmp_runtime("kbc07-decoy");
+        let mut decoy = live_named_child(&tmp, "decoy-keybackcon-tool", "30");
+        wait_exe_basename(decoy.id(), "decoy-keybackcon-tool");
+        let pid = decoy.id().cast_signed();
+        fs::write(tmp.join("keybackcon/animation.pid"), pid.to_string()).unwrap();
+        assert_eq!(stop_animation(), StopResult::NoHabia);
+        assert!(
+            Path::new(&format!("/proc/{pid}")).exists(),
+            "KBC-07: stop no señala el decoy"
+        );
+        let _ = decoy.kill();
+        let _ = decoy.wait();
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
     #[test]
     fn claim_flock_excluye_segundo_proceso() {
         let (tmp, _env) = tmp_runtime("flock");
@@ -502,11 +794,7 @@ mod tests {
     #[test]
     fn stop_con_zombie_es_detenida() {
         let (tmp, _env) = tmp_runtime("zombie-stop");
-        let mut child = Command::new("sleep")
-            .arg0("keybackcon")
-            .arg("0")
-            .spawn()
-            .unwrap();
+        let mut child = live_named_child(&tmp, "keybackcon", "0");
         let pid = child.id().cast_signed();
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
@@ -523,7 +811,7 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         fs::write(tmp.join("keybackcon/animation.pid"), pid.to_string()).unwrap();
-        // Un zombie cuenta como «había animación» si /proc sigue visible.
+        // Un zombie de binario conocido cuenta como «había animación».
         let r = stop_animation();
         assert!(
             matches!(r, StopResult::Detenida | StopResult::NoHabia),

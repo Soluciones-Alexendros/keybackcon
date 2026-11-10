@@ -492,7 +492,6 @@ mod tests {
     use super::*;
     use std::fs;
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-    use std::os::unix::process::CommandExt;
     use std::path::{Path, PathBuf};
     use std::process::Stdio;
     use std::sync::MutexGuard;
@@ -589,24 +588,35 @@ mod tests {
         match cmd_brightness(BrightnessChange::Up(10)) {
             Ok(()) => std::process::exit(0),
             Err(e) => {
+                // `process::exit` salta el flush del capture de libtest: volcar
+                // el error junto a la barrera para que el padre lo muestre.
+                if let Ok(go) = std::env::var("KEYBACKCON_TEST_BRIGHTNESS_BARRIER") {
+                    let err =
+                        PathBuf::from(go).with_file_name(format!("err-{}", std::process::id()));
+                    let _ = fs::write(&err, format!("brightness hijo: {e}\n"));
+                }
                 eprintln!("brightness hijo: {e}");
+                let _ = std::io::Write::flush(&mut std::io::stderr());
                 std::process::exit(1);
             }
         }
     }
 
     fn spawn_brightness_hijo(state: &Path, runtime: &Path, go: &Path) -> std::process::Child {
-        std::process::Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "cli::tests::brightness_hijo_concurrencia"])
+        let mut cmd = std::process::Command::new(std::env::current_exe().unwrap());
+        cmd.args(["--exact", "cli::tests::brightness_hijo_concurrencia"])
             .env("KEYBACKCON_BRIGHTNESS_CHILD", "1")
             .env("KEYBACKCON_TEST_BRIGHTNESS_BARRIER", go)
             .env("XDG_STATE_HOME", state)
             .env("XDG_RUNTIME_DIR", runtime)
             .env_remove("RUST_TEST_THREADS")
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("hijo de brillo")
+            .stderr(Stdio::piped());
+        // El candado HID del padre no siempre se hereda en todos los runners.
+        if let Ok(lock) = std::env::var("KEYBACKCON_WRITER_LOCK") {
+            cmd.env("KEYBACKCON_WRITER_LOCK", lock);
+        }
+        cmd.spawn().expect("hijo de brillo")
     }
 
     /// KBC-03: dos `+10` concurrentes desde 50 con animación viva → 70.
@@ -626,32 +636,47 @@ mod tests {
         state::save_persisted(&st).unwrap();
         assert_eq!(state::load_persisted().unwrap().brightness, 50);
 
-        let mut anim = std::process::Command::new("sleep")
-            .arg0("keybackcon")
-            .arg("8")
+        // Identidad estricta (KBC-06): basename exacto de exe/argv0, no subcadena.
+        // Copia del binario de test (no `sleep`/uutils multicall) para que el
+        // proceso viva y `/proc/<pid>/exe` resuelva a `keybackcon`.
+        let fixtures = runtime.join("fixtures");
+        fs::create_dir_all(&fixtures).unwrap();
+        let anim_bin = fixtures.join("keybackcon");
+        let _ = fs::remove_file(&anim_bin);
+        fs::copy(std::env::current_exe().unwrap(), &anim_bin)
+            .expect("copiar binario de test como fixture keybackcon");
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&anim_bin).unwrap().permissions();
+            perms.set_mode(perms.mode() | 0o111);
+            fs::set_permissions(&anim_bin, perms).unwrap();
+        }
+        let mut anim = std::process::Command::new(&anim_bin)
+            .args(["--exact", "animation::tests::fixture_sleep_child"])
+            .env("KEYBACKCON_ANIM_FIXTURE_SLEEP", "8")
+            .env_remove("RUST_TEST_THREADS")
             .spawn()
             .expect("animación falsa");
         let anim_pid = anim.id().cast_signed();
+        let pid_path = runtime.join("keybackcon/animation.pid");
+        fs::write(&pid_path, anim_pid.to_string()).unwrap();
+        // Esperar identidad completa (exe+argv0+uid): cmdline puede ir vacío
+        // un instante tras exec; si validamos pronto, se borraba el pidfile.
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            let cmd =
-                fs::read_to_string(format!("/proc/{}/cmdline", anim.id())).unwrap_or_default();
-            if cmd.contains("keybackcon") {
+            if animation::animation_pid_alive() == Some(anim_pid) {
                 break;
             }
-            assert!(Instant::now() < deadline, "animación falsa no arrancó");
+            // Si la carrera borró el pidfile, reponerlo mientras el proceso vive.
+            if !pid_path.exists() && Path::new(&format!("/proc/{anim_pid}")).exists() {
+                let _ = fs::write(&pid_path, anim_pid.to_string());
+            }
+            assert!(
+                Instant::now() < deadline,
+                "animación falsa no pasó identidad estricta (KBC-06)"
+            );
             std::thread::sleep(Duration::from_millis(5));
         }
-        fs::write(
-            runtime.join("keybackcon/animation.pid"),
-            anim_pid.to_string(),
-        )
-        .unwrap();
-        assert_eq!(
-            animation::animation_pid_alive(),
-            Some(anim_pid),
-            "hace falta animación reconocida viva para el camino sin HID"
-        );
 
         let a = spawn_brightness_hijo(&state_home, &runtime, &go);
         let b = spawn_brightness_hijo(&state_home, &runtime, &go);
@@ -678,6 +703,13 @@ mod tests {
         let code_a = out_a.status.code();
         let code_b = out_b.status.code();
         let final_brightness = state::load_persisted().unwrap().brightness;
+        let err_files: String = fs::read_dir(&barrier_dir)
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().starts_with("err-"))
+            .filter_map(|e| fs::read_to_string(e.path()).ok())
+            .collect();
 
         let _ = anim.kill();
         let _ = anim.wait();
@@ -686,14 +718,14 @@ mod tests {
         assert_eq!(
             code_a,
             Some(0),
-            "hijo A\nstdout: {}\nstderr: {}",
+            "hijo A\nstdout: {}\nstderr: {}\nerrfiles: {err_files}",
             String::from_utf8_lossy(&out_a.stdout),
             String::from_utf8_lossy(&out_a.stderr)
         );
         assert_eq!(
             code_b,
             Some(0),
-            "hijo B\nstdout: {}\nstderr: {}",
+            "hijo B\nstdout: {}\nstderr: {}\nerrfiles: {err_files}",
             String::from_utf8_lossy(&out_b.stdout),
             String::from_utf8_lossy(&out_b.stderr)
         );
