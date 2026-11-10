@@ -1,14 +1,17 @@
 try:
-    from gui.i18n import N_
+    from gui import api
 except ImportError:
-    try:
-        from .i18n import N_
-    except ImportError:
-        try:
-            from i18n import N_
-        except ImportError:
-            def N_(s):
-                return s
+    import os
+    import sys
+
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(_here)
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from gui import api
+
+load, _log_exc, _gettext_func = api(__file__)
+N_ = load("i18n").N_
 
 
 # Los nombres se traducen en el punto de uso (`_(nombre)`); `N_` solo los

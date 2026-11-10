@@ -3,25 +3,25 @@ import random
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
-try:
-    from gui.i18n import _
-except ImportError:
-    try:
-        from .i18n import _
-    except ImportError:
-        try:
-            from i18n import _
-        except ImportError:
-            def _(s):
-                return s
-try:
-    from gui.colors import hex_to_rgb, scale_rgb, hsv_to_rgb
-except ImportError:
-    try:
-        from .colors import hex_to_rgb, scale_rgb, hsv_to_rgb
-    except ImportError:
-        from colors import hex_to_rgb, scale_rgb, hsv_to_rgb
+import os
 
+try:
+    from gui import api
+except ImportError:
+    import sys
+
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _root = os.path.dirname(_here)
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from gui import api
+
+_load, _log_exc, _gettext_func = api(__file__)
+_ = _gettext_func()
+_colors = _load("colors")
+hex_to_rgb = _colors.hex_to_rgb
+scale_rgb = _colors.scale_rgb
+hsv_to_rgb = _colors.hsv_to_rgb
 
 MODES = ("fijar", "breathe", "rainbow")
 
