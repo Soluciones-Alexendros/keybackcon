@@ -22,6 +22,7 @@ Incluye: versión o commit, comando reproducido, distro, y un descriptor **míni
 
 - Transporte HID (`src/lamp.rs`, `src/protocol.rs`): ioctl `HIDIOC{G,S}FEATURE` con longitud acotada.
 - Instalación udev vía `pkexec`: las rutas van por `$1`/`$2`, no interpoladas en `sh -c`.
+- Candado de escritura `/run/keybackcon/writer.lock` (`root:keybackcon` `0660`): el paquete **no** añade usuarios al grupo; la habilitación es explícita (`usermod`).
 - Estado en `$XDG_STATE_HOME/keybackcon/state` y pidfile en `$XDG_RUNTIME_DIR`.
 - Renovate (`.github/renovate.json`) cubre `cargo` y `github-actions`. No hay Dependabot de version-updates.
 
