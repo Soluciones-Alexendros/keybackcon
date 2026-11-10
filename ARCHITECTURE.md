@@ -55,9 +55,11 @@ firmware declara `IntensityLevelCount=1`, no hay canal de brillo), `hsv`,
 ### `state.rs` — estado persistente
 
 `state_file()` nuevo (`keybackcon/state`) con lectura heredada
-(`kbd-rgb/state`); `load_state` tolerante, `save_state` atómica
-(fichero temporal + `rename`, avisa en stderr si falla), `apply` (apaga
-autónomo → color → persiste).
+(`kbd-rgb/state`). `parse_state_text` / `load_persisted` distinguen
+ausencia (defaults), corrupción y esquema futuro (error; el original se
+conserva). `save_persisted` usa temporal exclusivo `0600` + `rename`.
+La GUI reutiliza el mismo oráculo en `gui/client.py`. `apply` apaga
+autónomo → color → persiste.
 
 ### `animation.rs` — animación exclusiva y parada limpia
 

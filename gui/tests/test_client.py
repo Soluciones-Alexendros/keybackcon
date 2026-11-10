@@ -201,7 +201,8 @@ class TestEstadoYPidfile(unittest.TestCase):
         finally:
             env.restaurar()
 
-    def test_get_state_file_malformado_cae_a_legado(self):
+    def test_get_state_file_malformado_no_cae_a_legado(self):
+        """KBC-12/16: primario corrupto no consulta legado ni inventa color real."""
         env = EntornoXdg()
         try:
             base = env.tmp
@@ -213,7 +214,7 @@ class TestEstadoYPidfile(unittest.TestCase):
                 f.write("basura sin sentido\n")
             with open(os.path.join(legado, "state"), "w") as f:
                 f.write("ff0000 60\n")
-            self.assertEqual(KeybackconClient().get_state_file(), ("ff0000", 60))
+            self.assertEqual(KeybackconClient().get_state_file(), ("ffffff", 100))
         finally:
             env.restaurar()
 
@@ -223,6 +224,43 @@ class TestEstadoYPidfile(unittest.TestCase):
             self.assertEqual(KeybackconClient().get_state_file(), ("ffffff", 100))
         finally:
             env.restaurar()
+
+    def test_get_state_file_solo_legado(self):
+        env = EntornoXdg()
+        try:
+            legado = os.path.join(env.tmp, "state", "kbd-rgb")
+            os.makedirs(legado, exist_ok=True)
+            with open(os.path.join(legado, "state"), "w") as f:
+                f.write("ff0000 60\n")
+            self.assertEqual(KeybackconClient().get_state_file(), ("ff0000", 60))
+        finally:
+            env.restaurar()
+
+    def test_kbc16_oraculo_compartido_testdata(self):
+        from gui.client import parse_state_text
+
+        root = os.path.join(
+            os.path.dirname(__file__), "..", "..", "testdata", "state"
+        )
+        oracle = os.path.join(root, "oracle.txt")
+        with open(oracle) as f:
+            lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            kind, name = parts[0], parts[1]
+            with open(os.path.join(root, name)) as f:
+                raw = f.read()
+            got_kind, payload = parse_state_text(raw)
+            self.assertEqual(got_kind, kind, name)
+            if kind == "ok":
+                self.assertEqual(payload, (parts[2], int(parts[3])), name)
+            elif kind == "unsupported":
+                self.assertEqual(payload, int(parts[2]), name)
+            else:
+                self.assertIsNone(payload, name)
 
     def test_animation_running_detecta_proceso_propio(self):
         env = EntornoXdg()

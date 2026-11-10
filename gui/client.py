@@ -53,6 +53,10 @@ def _absolute_or_none(path: str | None) -> str | None:
     return p
 
 
+# Debe coincidir con ``SCHEMA_VERSION`` en ``src/state.rs`` (KBC-16).
+SCHEMA_VERSION = 1
+
+
 def state_paths() -> tuple[str, str] | None:
     """Rutas de estado, o None si no hay XDG absoluto.
 
@@ -69,6 +73,87 @@ def state_paths() -> tuple[str, str] | None:
         os.path.join(base, "keybackcon/state"),
         os.path.join(base, "kbd-rgb/state"),
     )
+
+
+def _clamp_brightness(value) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        raise ValueError("brightness")
+    return max(0, min(100, n))
+
+
+def _looks_versioned(raw: str) -> bool:
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, _ = line.partition("=")
+        if key.strip() == "schema_version":
+            return True
+    return False
+
+
+def _parse_legacy_line(raw: str) -> tuple[str, int] | None:
+    parts = raw.split()
+    if not parts:
+        return None
+    color = parts[0].lstrip("#").lower()
+    if len(color) != 6:
+        return None
+    try:
+        int(color, 16)
+    except ValueError:
+        return None
+    pct = 100 if len(parts) < 2 else _clamp_brightness(parts[1])
+    return color, pct
+
+
+def parse_state_text(raw: str) -> tuple[str, object]:
+    """Oráculo compartido con ``src/state.rs`` (KBC-12 / KBC-16).
+
+    Devuelve ``("ok", (color_hex, brightness))``, ``("corrupt", None)`` o
+    ``("unsupported", version)``.
+    """
+    if _looks_versioned(raw):
+        color, pct = "ffffff", 100
+        saw_version = False
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key, value = key.strip(), value.strip()
+            if key == "schema_version":
+                try:
+                    ver = int(value)
+                except ValueError:
+                    return "corrupt", None
+                if ver == 0 or ver > SCHEMA_VERSION:
+                    return "unsupported", ver
+                saw_version = True
+            elif key == "base_color":
+                color = value.lstrip("#").lower()
+                if len(color) != 6:
+                    return "corrupt", None
+                try:
+                    int(color, 16)
+                except ValueError:
+                    return "corrupt", None
+            elif key == "brightness":
+                try:
+                    pct = _clamp_brightness(value)
+                except ValueError:
+                    return "corrupt", None
+        if not saw_version:
+            return "corrupt", None
+        return "ok", (color, pct)
+    legacy = _parse_legacy_line(raw)
+    if legacy is not None:
+        return "ok", legacy
+    return "corrupt", None
 
 
 def pid_paths():
@@ -223,38 +308,31 @@ class KeybackconClient:
         self._run(["firmware-effects", "on" if on else "off"])
 
     def get_state_file(self) -> tuple[str, int]:
+        """Lee color/brillo con el mismo oráculo que Rust (KBC-16).
+
+        Ausencia → defaults. Primario presente pero corrupto/futuro → defaults
+        de solo lectura (no se escribe; el CLI fallará al RMW y conserva el
+        original, KBC-12). No se cae al legado si el primario existe.
+        """
         paths = state_paths()
         if paths is None:
             return "ffffff", 100
-        for path in paths:
+        primary, legacy = paths
+        for path, is_primary in ((primary, True), (legacy, False)):
             try:
                 with open(path) as f:
                     raw = f.read()
-                # Formato versionado (schema_version=…).
-                if "schema_version=" in raw or "base_color=" in raw:
-                    color, pct = "ffffff", 100
-                    for line in raw.splitlines():
-                        if "=" not in line:
-                            continue
-                        k, _, v = line.partition("=")
-                        k, v = k.strip(), v.strip()
-                        if k == "base_color":
-                            color = v.lstrip("#").lower()
-                        elif k == "brightness":
-                            pct = int(v)
-                    if len(color) == 6:
-                        int(color, 16)
-                        return color, max(0, min(100, pct))
-                    continue
-                parts = raw.split()
-                color = parts[0].lstrip("#").lower()
-                pct = int(parts[1]) if len(parts) > 1 else 100
-                if len(color) != 6:
-                    raise ValueError
-                int(color, 16)
-                return color, max(0, min(100, pct))
-            except Exception:
+            except FileNotFoundError:
                 continue
+            except OSError:
+                if is_primary:
+                    return "ffffff", 100
+                continue
+            kind, payload = parse_state_text(raw)
+            if kind == "ok":
+                return payload  # type: ignore[return-value]
+            # Primario ilegible: no consultar legado (alineado con load_persisted).
+            return "ffffff", 100
         return "ffffff", 100
 
     def animation_running(self) -> int | None:

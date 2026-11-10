@@ -1,0 +1,6 @@
+schema_version=1
+base_color=ff7800
+brightness=60
+power=on
+mode=fijar
+restore_policy=user
