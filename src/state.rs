@@ -475,36 +475,24 @@ mod tests {
 
     #[test]
     fn state_migra_desde_legado() {
-        let _env = crate::TEST_ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut env = crate::EnvGuard::lock();
         let tmp = PathBuf::from(format!("/tmp/keybackcon-state-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("kbd-rgb")).unwrap();
         fs::write(tmp.join("kbd-rgb/state"), "ff7800 60\n").unwrap();
-        // SAFETY: TEST_ENV_LOCK serializa el entorno.
-        unsafe {
-            std::env::set_var("XDG_STATE_HOME", &tmp);
-        }
+        env.set("XDG_STATE_HOME", &tmp);
         let (c, p) = load_state().unwrap();
         assert_eq!((c, p), ((255, 120, 0), 60));
         let _ = fs::remove_dir_all(&tmp);
-        unsafe {
-            std::env::remove_var("XDG_STATE_HOME");
-        }
     }
 
     #[test]
     fn save_state_es_atómico_y_versionado() {
-        let _env = crate::TEST_ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut env = crate::EnvGuard::lock();
         let tmp = PathBuf::from(format!("/tmp/keybackcon-state-save-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
-        unsafe {
-            std::env::set_var("XDG_STATE_HOME", &tmp);
-        }
+        env.set("XDG_STATE_HOME", &tmp);
         save_state((255, 120, 0), 60).unwrap();
         assert_eq!(load_state().unwrap(), ((255, 120, 0), 60));
         let raw = fs::read_to_string(tmp.join("keybackcon/state")).unwrap();
@@ -514,16 +502,11 @@ mod tests {
         let st = load_persisted().unwrap();
         assert_eq!(st.mode, "breathe");
         let _ = fs::remove_dir_all(&tmp);
-        unsafe {
-            std::env::remove_var("XDG_STATE_HOME");
-        }
     }
 
     #[test]
     fn kbc05_limpieza_obsoleta_no_pisa_off() {
-        let _env = crate::TEST_ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut env = crate::EnvGuard::lock();
         let tmp = PathBuf::from(format!(
             "/tmp/keybackcon-state-kbc05-{}",
             std::process::id()
@@ -540,13 +523,8 @@ mod tests {
             .mode(0o700)
             .create(runtime.join("keybackcon"))
             .unwrap();
-        let prev_state = std::env::var_os("XDG_STATE_HOME");
-        let prev_runtime = std::env::var_os("XDG_RUNTIME_DIR");
-        // SAFETY: TEST_ENV_LOCK serializa el entorno.
-        unsafe {
-            std::env::set_var("XDG_STATE_HOME", &tmp);
-            std::env::set_var("XDG_RUNTIME_DIR", &runtime);
-        }
+        env.set("XDG_STATE_HOME", &tmp);
+        env.set("XDG_RUNTIME_DIR", &runtime);
 
         let run_id = begin_animation_mode("breathe").unwrap();
         let mid = load_persisted().unwrap();
@@ -565,32 +543,18 @@ mod tests {
 
         let _ = fs::remove_dir_all(&tmp);
         let _ = fs::remove_dir_all(&runtime);
-        unsafe {
-            match prev_state {
-                Some(v) => std::env::set_var("XDG_STATE_HOME", v),
-                None => std::env::remove_var("XDG_STATE_HOME"),
-            }
-            match prev_runtime {
-                Some(v) => std::env::set_var("XDG_RUNTIME_DIR", v),
-                None => std::env::remove_var("XDG_RUNTIME_DIR"),
-            }
-        }
     }
 
     #[test]
     fn kbc03_update_brightness_serializa_dos_ups() {
-        let _env = crate::TEST_ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut env = crate::EnvGuard::lock();
         let tmp = PathBuf::from(format!(
             "/tmp/keybackcon-state-kbc03-txn-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
-        unsafe {
-            std::env::set_var("XDG_STATE_HOME", &tmp);
-        }
+        env.set("XDG_STATE_HOME", &tmp);
         let st = PersistedState {
             brightness: 50,
             ..Default::default()
@@ -600,9 +564,6 @@ mod tests {
         update_brightness(|c| c.saturating_add(10), false).unwrap();
         assert_eq!(load_persisted().unwrap().brightness, 70);
         let _ = fs::remove_dir_all(&tmp);
-        unsafe {
-            std::env::remove_var("XDG_STATE_HOME");
-        }
     }
 
     #[test]
@@ -725,31 +686,14 @@ mod tests {
 
     #[test]
     fn t07_sin_xdg_no_hay_fallback_compartido() {
-        let _env = crate::TEST_ENV_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let prev_home = std::env::var_os("HOME");
-        let prev_xdg = std::env::var_os("XDG_STATE_HOME");
-        // SAFETY: TEST_ENV_LOCK serializa el entorno; se restaura al salir.
-        unsafe {
-            std::env::remove_var("XDG_STATE_HOME");
-            std::env::set_var("HOME", "relativo/no-absoluto");
-        }
+        let mut env = crate::EnvGuard::lock();
+        env.remove("XDG_STATE_HOME");
+        env.set("HOME", "relativo/no-absoluto");
         let err = state_file().unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::NotFound, "{err}");
         assert!(
             !err.to_string().contains("/var/tmp"),
             "no debe aparecer un fallback compartido: {err}"
         );
-        unsafe {
-            match prev_home {
-                Some(v) => std::env::set_var("HOME", v),
-                None => std::env::remove_var("HOME"),
-            }
-            match prev_xdg {
-                Some(v) => std::env::set_var("XDG_STATE_HOME", v),
-                None => std::env::remove_var("XDG_STATE_HOME"),
-            }
-        }
     }
 }
