@@ -591,10 +591,8 @@ mod tests {
                 // `process::exit` salta el flush del capture de libtest: volcar
                 // el error junto a la barrera para que el padre lo muestre.
                 if let Ok(go) = std::env::var("KEYBACKCON_TEST_BRIGHTNESS_BARRIER") {
-                    let err = PathBuf::from(go).with_file_name(format!(
-                        "err-{}",
-                        std::process::id()
-                    ));
+                    let err =
+                        PathBuf::from(go).with_file_name(format!("err-{}", std::process::id()));
                     let _ = fs::write(&err, format!("brightness hijo: {e}\n"));
                 }
                 eprintln!("brightness hijo: {e}");
