@@ -1,5 +1,5 @@
 [Unit]
-Description=Keyboard Backlight Controls — restaura el color al iniciar sesión
+Description=iLutex — restaura el color al iniciar sesión
 # Tras la sesión gráfica; evita After=default.target + WantedBy=default.target.
 After=graphical-session.target
 PartOf=graphical-session.target
@@ -7,7 +7,7 @@ PartOf=graphical-session.target
 [Service]
 Type=oneshot
 # --on-login respeta restore_policy=never del estado persistido.
-ExecStart=/usr/bin/keybackcon restore --on-login
+ExecStart=/usr/bin/ilutex restore --on-login
 RemainAfterExit=yes
 # Al iniciar sesión las ACL uaccess pueden no estar aplicadas todavía.
 Restart=on-failure

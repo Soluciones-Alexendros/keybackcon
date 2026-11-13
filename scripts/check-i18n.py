@@ -96,7 +96,7 @@ def supported_locales():
 def extract_pot(dest):
     """Extrae los msgid del código a `dest`. True si xgettext funcionó."""
     cmd = ["xgettext"] + XGETTEXT_FLAGS + [
-        "--package-name=keybackcon",
+        "--package-name=ilutex",
         "--output=" + dest,
     ]
     sources = sorted(

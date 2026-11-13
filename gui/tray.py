@@ -87,7 +87,7 @@ def _clamp_brightness(value):
 
 def _cache_dir():
     base = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-    path = os.path.join(base, "keybackcon")
+    path = os.path.join(base, "ilutex")
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -181,11 +181,11 @@ class TrayIndicator:
             log_exc("estado inicial de bandeja")
         self._visible = True
         self._indicator = AyatanaAppIndicator3.Indicator.new(
-            "keybackcon",
-            "keybackcon",
+            "ilutex",
+            "ilutex",
             AyatanaAppIndicator3.IndicatorCategory.HARDWARE,
         )
-        self._indicator.set_title("keybackcon")
+        self._indicator.set_title("iLutex")
         self._indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
         self._build_menu()
         self._render_icon()
@@ -435,7 +435,7 @@ class TrayIndicator:
             log_exc("icono de bandeja")
             return
         try:
-            self._indicator.set_icon_full(path, "keybackcon")
+            self._indicator.set_icon_full(path, "ilutex")
         except Exception:
             try:
                 self._indicator.set_icon(path)

@@ -51,7 +51,7 @@ class TestTema(unittest.TestCase):
         self.assertEqual(theme.get_theme(), "system")
 
     def test_valor_invalido_en_archivo_ignorado(self):
-        path = os.path.join(self.env.tmp, "keybackcon", "theme")
+        path = os.path.join(self.env.tmp, "ilutex", "theme")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             f.write("chicle\n")
@@ -63,11 +63,70 @@ class TestTema(unittest.TestCase):
         try:
             theme._schema_cache.clear()
             self.assertIsNone(
-                theme.lookup_settings("org.iniciativas.keybackcon.inexistente")
+                theme.lookup_settings("org.alexendros.ilutex.inexistente")
             )
         finally:
             theme._schema_cache.clear()
             self._sin_gsettings.start()
+
+
+class TestAcentoOmarchy(unittest.TestCase):
+    """Lectura del acento de Omarchy desde colors.toml."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="kbc-test-accent-")
+        self.path = os.path.join(self.tmp, "colors.toml")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _escribir(self, contenido):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write(contenido)
+
+    def test_lee_acento_con_comillas_dobles(self):
+        self._escribir('mode = "dark"\naccent = "#dcd7ba"\n')
+        self.assertEqual(theme._read_omarchy_accent(self.path), "#dcd7ba")
+
+    def test_lee_acento_con_comillas_simples(self):
+        self._escribir("accent = '#ff7800'\n")
+        self.assertEqual(theme._read_omarchy_accent(self.path), "#ff7800")
+
+    def test_lee_acento_sin_comillas(self):
+        self._escribir("accent = #a000ff\n")
+        self.assertEqual(theme._read_omarchy_accent(self.path), "#a000ff")
+
+    def test_fichero_ausente_devuelve_fallback(self):
+        self.assertEqual(
+            theme._read_omarchy_accent(os.path.join(self.tmp, "nada.toml")),
+            theme.OMARCHY_ACCENT_FALLBACK,
+        )
+
+    def test_sin_clave_accent_devuelve_fallback(self):
+        self._escribir('mode = "dark"\nred = "#c34043"\n')
+        self.assertEqual(
+            theme._read_omarchy_accent(self.path), theme.OMARCHY_ACCENT_FALLBACK
+        )
+
+    def test_acento_invalido_devuelve_fallback(self):
+        self._escribir('accent = "rojo"\n')
+        self.assertEqual(
+            theme._read_omarchy_accent(self.path), theme.OMARCHY_ACCENT_FALLBACK
+        )
+
+    def test_callbacks_se_registran_y_notifican(self):
+        recibidos = []
+        unregister = theme.on_accent_changed(recibidos.append)
+        try:
+            theme._accent_changed_callbacks_backup = list(
+                theme._accent_changed_callbacks
+            )
+            theme._accent_changed()
+            self.assertEqual(len(recibidos), 1)
+        finally:
+            unregister()
+        theme._accent_changed()
+        self.assertEqual(len(recibidos), 1)  # ya desregistrado
 
 
 if __name__ == "__main__":

@@ -3,16 +3,16 @@ import os
 import sys
 import warnings
 
-APP_ID = "org.iniciativas.keybackcon"
+APP_ID = "org.alexendros.ilutex"
 
-DBUS_NAME = "org.iniciativas.keybackcon"
-DBUS_PATH = "/org/iniciativas/keybackcon"
-DBUS_CONTROL_IFACE = "org.iniciativas.keybackcon.Control"
+DBUS_NAME = "org.alexendros.ilutex"
+DBUS_PATH = "/org/alexendros/ilutex"
+DBUS_CONTROL_IFACE = "org.alexendros.ilutex.Control"
 CONTROL_METHODS = ("Toggle", "Present", "Quit")
 CONTROL_TIMEOUT_MS = 1500
 CONTROL_XML = """
 <node>
-  <interface name="org.iniciativas.keybackcon.Control">
+  <interface name="org.alexendros.ilutex.Control">
     <method name="Toggle"/>
     <method name="Present"/>
     <method name="Quit"/>
@@ -22,7 +22,7 @@ CONTROL_XML = """
 
 USAGE = """Uso: main.py [--tray] [--tray-child] [--preferences] [-h | --help]
 
-Keyboard Backlight Controls — ventana y bandeja del sistema.
+iLutex — ventana y bandeja del sistema.
 
 Opciones:
   --tray          Arranca en la bandeja del sistema, sin ventana visible.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Postinstalación de keybackcon: deja el paquete listo para funcionar.
+// Postinstalación de ilutex: deja el paquete listo para funcionar.
 //  1. Regla udev -> /etc/udev/rules.d (sudo/pkexec; opt-out con
-//     KEYBACKCON_SKIP_UDEV=1).
+//     ILUTEX_SKIP_UDEV=1).
 //  2. Unidades systemd de usuario -> ~/.config/systemd/user, con la ruta del
 //     binario resuelta, y recarga de systemd. No activa nada que el usuario
 //     hubiera desactivado; solo habilita la restauración al login si la unidad
@@ -18,15 +18,15 @@ const path = require('path');
 const ROOT = __dirname;
 
 function log(msg) {
-  console.log(`keybackcon: ${msg}`);
+  console.log(`ilutex: ${msg}`);
 }
 
 function warn(msg) {
-  console.warn(`keybackcon: aviso: ${msg}`);
+  console.warn(`ilutex: aviso: ${msg}`);
 }
 
 function resolveBinary() {
-  for (const name of ['keybackcon-linux-x64', 'keybackcon-linux-arm64']) {
+  for (const name of ['ilutex-linux-x64', 'ilutex-linux-arm64']) {
     try {
       const bin = require(name);
       if (typeof bin === 'string' && fs.existsSync(bin)) return bin;
@@ -43,13 +43,13 @@ function run(cmd, args, opts = {}) {
 }
 
 function installUdev() {
-  if (process.env.KEYBACKCON_SKIP_UDEV === '1') {
-    log('regla udev omitida (KEYBACKCON_SKIP_UDEV=1)');
+  if (process.env.ILUTEX_SKIP_UDEV === '1') {
+    log('regla udev omitida (ILUTEX_SKIP_UDEV=1)');
     return;
   }
-  const dest = '/etc/udev/rules.d/70-keybackcon.rules';
+  const dest = '/etc/udev/rules.d/70-ilutex.rules';
   if (fs.existsSync(dest)) return;
-  const src = path.join(ROOT, 'udev', '70-keybackcon.rules');
+  const src = path.join(ROOT, 'udev', '70-ilutex.rules');
   if (process.getuid && process.getuid() === 0) {
     if (run('install', ['-m644', src, dest])) {
       run('udevadm', ['control', '--reload']);
@@ -72,20 +72,20 @@ function installUdev() {
 }
 
 function installWriterLock() {
-  if (process.env.KEYBACKCON_SKIP_UDEV === '1') {
-    log('candado de escritura omitido (KEYBACKCON_SKIP_UDEV=1)');
+  if (process.env.ILUTEX_SKIP_UDEV === '1') {
+    log('candado de escritura omitido (ILUTEX_SKIP_UDEV=1)');
     return;
   }
-  const sys = path.join(ROOT, 'sysusers.d', 'keybackcon.conf');
-  const tmp = path.join(ROOT, 'tmpfiles.d', 'keybackcon.conf');
-  const sysDest = '/usr/lib/sysusers.d/keybackcon.conf';
-  const tmpDest = '/usr/lib/tmpfiles.d/keybackcon.conf';
+  const sys = path.join(ROOT, 'sysusers.d', 'ilutex.conf');
+  const tmp = path.join(ROOT, 'tmpfiles.d', 'ilutex.conf');
+  const sysDest = '/usr/lib/sysusers.d/ilutex.conf';
+  const tmpDest = '/usr/lib/tmpfiles.d/ilutex.conf';
   const cmds = process.getuid && process.getuid() === 0
     ? [
         ['install', ['-D', '-m644', sys, sysDest]],
         ['install', ['-D', '-m644', tmp, tmpDest]],
-        ['systemd-sysusers', ['keybackcon.conf']],
-        ['systemd-tmpfiles', ['--create', 'keybackcon.conf']],
+        ['systemd-sysusers', ['ilutex.conf']],
+        ['systemd-tmpfiles', ['--create', 'ilutex.conf']],
       ]
     : null;
   if (cmds) {
@@ -96,18 +96,18 @@ function installWriterLock() {
   const sudo = [
     ['install', ['-D', '-m644', sys, sysDest]],
     ['install', ['-D', '-m644', tmp, tmpDest]],
-    ['systemd-sysusers', ['keybackcon.conf']],
-    ['systemd-tmpfiles', ['--create', 'keybackcon.conf']],
+    ['systemd-sysusers', ['ilutex.conf']],
+    ['systemd-tmpfiles', ['--create', 'ilutex.conf']],
   ];
   if (sudo.every(([cmd, args]) => run('sudo', ['-n', cmd, ...args]))) {
     log('candado de escritura instalado (sudo)');
     return;
   }
   warn(
-    'no se pudo crear /run/keybackcon/writer.lock. Sin ese candado el CLI no escribe.\n' +
+    'no se pudo crear /run/ilutex/writer.lock. Sin ese candado el CLI no escribe.\n' +
       `   sudo install -D -m644 ${sys} ${sysDest}\n` +
       `   sudo install -D -m644 ${tmp} ${tmpDest}\n` +
-      '   sudo systemd-sysusers keybackcon.conf && sudo systemd-tmpfiles --create keybackcon.conf'
+      '   sudo systemd-sysusers ilutex.conf && sudo systemd-tmpfiles --create ilutex.conf'
   );
 }
 
@@ -122,12 +122,12 @@ function installSystemdUnits(bin) {
   // (mismo contrato que scripts/install.sh H-26/H-27 / KBC-10).
   const prevEnableResult = spawnSync(
     'systemctl',
-    ['--user', 'is-enabled', 'keybackcon.service'],
+    ['--user', 'is-enabled', 'ilutex.service'],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
   );
   const prevEnable = (prevEnableResult.stdout || '').trim();
-  const hadUnit = fs.existsSync(path.join(dir, 'keybackcon.service'));
-  const units = ['keybackcon.service', 'keybackcon-animation@.service'];
+  const hadUnit = fs.existsSync(path.join(dir, 'ilutex.service'));
+  const units = ['ilutex.service', 'ilutex-animation@.service'];
   for (const unit of units) {
     const tmpl = fs.readFileSync(path.join(ROOT, 'systemd', unit), 'utf8');
     const rendered = tmpl.split('__KEYBACKCON_BIN__').join(bin);
@@ -139,7 +139,7 @@ function installSystemdUnits(bin) {
     }
   }
   run('systemctl', ['--user', 'daemon-reload']);
-  const enable = path.join(dir, 'keybackcon.service');
+  const enable = path.join(dir, 'ilutex.service');
   if (!fs.existsSync(enable)) return;
   if (prevEnable === 'disabled' || prevEnable === 'masked') {
     log(`restauración ${prevEnable}; no se reactiva`);
@@ -149,10 +149,10 @@ function installSystemdUnits(bin) {
     return;
   }
   // Alta nueva o estado no-disabled/masked: enable si no había unidad o se fuerza.
-  const forceEnable = process.env.KEYBACKCON_ENABLE_RESTORE === '1';
+  const forceEnable = process.env.ILUTEX_ENABLE_RESTORE === '1';
   if (!hadUnit || forceEnable) {
-    run('systemctl', ['--user', 'enable', 'keybackcon.service']);
-    log('restauración al login habilitada (systemctl --user enable keybackcon.service)');
+    run('systemctl', ['--user', 'enable', 'ilutex.service']);
+    log('restauración al login habilitada (systemctl --user enable ilutex.service)');
   }
 }
 
@@ -168,7 +168,7 @@ function main() {
   installUdev();
   installWriterLock();
   if (bin) installSystemdUnits(bin);
-  log('listo. Prueba con: keybackcon info');
+  log('listo. Prueba con: ilutex info');
 }
 
 module.exports = {

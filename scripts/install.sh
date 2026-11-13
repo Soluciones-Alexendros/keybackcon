@@ -47,28 +47,28 @@ pkg_hint() {
   esac
 }
 
-echo "==> keybackcon: compilar (release)"
+echo "==> ilutex: compilar (release)"
 cargo build --release --manifest-path "${REPO_DIR}/Cargo.toml"
 
-echo "==> keybackcon: instalar binario en ${BIN_DST}/keybackcon"
+echo "==> ilutex: instalar binario en ${BIN_DST}/ilutex"
 mkdir -p "${BIN_DST}"
-install -m755 "${REPO_DIR}/target/release/keybackcon" "${BIN_DST}/keybackcon"
+install -m755 "${REPO_DIR}/target/release/ilutex" "${BIN_DST}/ilutex"
 
-echo "==> keybackcon: instalar GUI en ${BIN_DST}/keybackcon-gui"
-GUI_DST="${HOME}/.local/share/keybackcon/gui"
+echo "==> ilutex: instalar GUI en ${BIN_DST}/ilutex-gui"
+GUI_DST="${HOME}/.local/share/ilutex/gui"
 mkdir -p "${GUI_DST}"
 install -m644 "${REPO_DIR}"/gui/*.py "${GUI_DST}/"
-install -m644 "${REPO_DIR}/packaging/udev/70-keybackcon.rules" "${HOME}/.local/share/keybackcon/70-keybackcon.rules"
-install -m755 "${REPO_DIR}/packaging/keybackcon-gui" "${BIN_DST}/keybackcon-gui"
+install -m644 "${REPO_DIR}/packaging/udev/70-ilutex.rules" "${HOME}/.local/share/ilutex/70-ilutex.rules"
+install -m755 "${REPO_DIR}/packaging/ilutex-gui" "${BIN_DST}/ilutex-gui"
 
-echo "==> keybackcon: compilar traducciones (es, en)"
+echo "==> ilutex: compilar traducciones (es, en)"
 MO_SRC_DIR="${REPO_DIR}/po"
 if command -v msgfmt >/dev/null 2>&1; then
   for MO_SRC in "${MO_SRC_DIR}"/*.po; do
     [ -f "${MO_SRC}" ] || continue
     LANG_CODE="$(basename "${MO_SRC}" .po)"
-    MO_BUILD="${REPO_DIR}/gui/locale/${LANG_CODE}/LC_MESSAGES/keybackcon.mo"
-    MO_DST="${HOME}/.local/share/locale/${LANG_CODE}/LC_MESSAGES/keybackcon.mo"
+    MO_BUILD="${REPO_DIR}/gui/locale/${LANG_CODE}/LC_MESSAGES/ilutex.mo"
+    MO_DST="${HOME}/.local/share/locale/${LANG_CODE}/LC_MESSAGES/ilutex.mo"
     mkdir -p "$(dirname "${MO_BUILD}")"
     msgfmt -o "${MO_BUILD}" "${MO_SRC}"
     echo "    .mo generado en ${MO_BUILD}"
@@ -81,11 +81,11 @@ else
   echo "    pista: $(pkg_hint gettext)" >&2
 fi
 
-echo "==> keybackcon: instalar schema GSettings"
-SCHEMA_SRC="${REPO_DIR}/gui/org.iniciativas.keybackcon.gschema.xml"
+echo "==> ilutex: instalar schema GSettings"
+SCHEMA_SRC="${REPO_DIR}/gui/org.alexendros.ilutex.gschema.xml"
 SCHEMA_DST_DIR="${HOME}/.local/share/glib-2.0/schemas"
 mkdir -p "${SCHEMA_DST_DIR}"
-install -m644 "${SCHEMA_SRC}" "${SCHEMA_DST_DIR}/org.iniciativas.keybackcon.gschema.xml"
+install -m644 "${SCHEMA_SRC}" "${SCHEMA_DST_DIR}/org.alexendros.ilutex.gschema.xml"
 if command -v glib-compile-schemas >/dev/null 2>&1; then
   glib-compile-schemas "${SCHEMA_DST_DIR}" || true
 else
@@ -93,124 +93,127 @@ else
   echo "    pista: $(pkg_hint glib)" >&2
 fi
 # Nota: sin autostart global. El autostart es opt-in desde el diálogo de
-# preferencias (gui/settings.py), que crea ~/.config/autostart/keybackcon-tray.desktop bajo demanda.
+# preferencias (gui/settings.py), que crea ~/.config/autostart/ilutex-tray.desktop bajo demanda.
 
-echo "==> keybackcon: instalar lanzador + icono"
+echo "==> ilutex: instalar lanzador + icono"
 mkdir -p "${DESK_DST}" "${ICON_DST}"
-install -m644 "${REPO_DIR}/packaging/desktop/keybackcon.desktop" "${DESK_DST}/keybackcon.desktop"
-install -m644 "${REPO_DIR}/assets/icons/keybackcon.svg" "${ICON_DST}/keybackcon.svg"
-if command -v update-desktop-database >/dev/null 2>&1; then
-  update-desktop-database "${DESK_DST}" || true
-fi
-if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-  gtk-update-icon-cache -f "${HOME}/.local/share/icons/hicolor" || true
-fi
+install -m644 "${REPO_DIR}/packaging/desktop/ilutex.desktop" "${DESK_DST}/ilutex.desktop"
+install -m644 "${REPO_DIR}/assets/icons/ilutex.svg" "${ICON_DST}/ilutex.svg"
 
-echo "==> keybackcon: instalar unidades de usuario"
+echo "==> ilutex: instalar unidades systemd de usuario"
 mkdir -p "${UNIT_DST}"
-# Preferencia previa: no reactivar si el usuario deshabilitó o enmascaró.
-PREV_ENABLE=""
-if command -v systemctl >/dev/null 2>&1; then
-  PREV_ENABLE=$(systemctl --user is-enabled keybackcon.service 2>/dev/null || true)
-fi
-HAD_UNIT=0
-[ -f "${UNIT_DST}/keybackcon.service" ] && HAD_UNIT=1
-# Las unidades del paquete apuntan a /usr/bin; la instalación local las
-# reescribe a ~/.local/bin (mismo binario que acaba de instalarse arriba).
-sed 's|/usr/bin/keybackcon|%h/.local/bin/keybackcon|g' \
-  "${REPO_DIR}/packaging/systemd/keybackcon.service" \
-  > "${UNIT_DST}/keybackcon.service"
-sed 's|/usr/bin/keybackcon|%h/.local/bin/keybackcon|g' \
-  "${REPO_DIR}/packaging/systemd/keybackcon-animation@.service" \
-  > "${UNIT_DST}/keybackcon-animation@.service"
-chmod 644 "${UNIT_DST}/keybackcon.service" "${UNIT_DST}/keybackcon-animation@.service"
-if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user daemon-reload || true
-  case "${PREV_ENABLE}" in
-    disabled|masked)
-      echo "==> keybackcon: restauración ${PREV_ENABLE}; no se reactiva (H-26/H-27)"
-      ;;
-    enabled|enabled-runtime)
-      ;;
-    *)
-      if [ "${HAD_UNIT}" = "0" ] || [ "${KEYBACKCON_ENABLE_RESTORE:-0}" = "1" ]; then
-        systemctl --user enable keybackcon.service || true
-      fi
-      ;;
-  esac
-fi
+for unit in "${REPO_DIR}/packaging/systemd"/*.service; do
+  [ -f "$unit" ] || continue
+  sed "s|__KEYBACKCON_BIN__|${BIN_DST}/ilutex|g" "$unit" > "${UNIT_DST}/$(basename "$unit")"
+done
+systemctl --user daemon-reload 2>/dev/null || true
 
-if [ "${KEYBACKCON_SKIP_UDEV:-0}" = "1" ]; then
-  echo "==> keybackcon: regla udev omitida (KEYBACKCON_SKIP_UDEV=1)"
-elif [ -f /etc/udev/rules.d/70-keybackcon.rules ]; then
-  echo "==> keybackcon: regla udev ya presente, nada que hacer"
+# Restauración al login: solo si la unidad es nueva o se fuerza (KEYBACKCON_ENABLE_RESTORE=1).
+prev_enable="$(systemctl --user is-enabled ilutex.service 2>/dev/null || true)"
+had_unit=false
+[ -f "${UNIT_DST}/ilutex.service" ] && had_unit=true
+if [ "$prev_enable" = "disabled" ] || [ "$prev_enable" = "masked" ]; then
+  echo "==> ilutex: restauración ${prev_enable}; no se reactiva"
+elif [ "$prev_enable" = "enabled" ] || [ "$prev_enable" = "enabled-runtime" ]; then
+  : # ya activa
 else
-  echo "==> keybackcon: instalar regla udev (pide sudo)"
-  sudo install -m644 "${REPO_DIR}/packaging/udev/70-keybackcon.rules" /etc/udev/rules.d/70-keybackcon.rules
-  sudo udevadm control --reload
-  sudo udevadm trigger --subsystem-match=hidraw || true
-fi
-
-if [ "${KEYBACKCON_SKIP_UDEV:-0}" != "1" ]; then
-  echo "==> keybackcon: grupo y candado de escritura (pide sudo)"
-  writer_lock_ok=1
-  if ! sudo install -D -m644 "${REPO_DIR}/packaging/sysusers.d/keybackcon.conf" /usr/lib/sysusers.d/keybackcon.conf; then
-    echo "    error: no se pudo instalar sysusers.d/keybackcon.conf" >&2
-    writer_lock_ok=0
-  fi
-  if ! sudo install -D -m644 "${REPO_DIR}/packaging/tmpfiles.d/keybackcon.conf" /usr/lib/tmpfiles.d/keybackcon.conf; then
-    echo "    error: no se pudo instalar tmpfiles.d/keybackcon.conf" >&2
-    writer_lock_ok=0
-  fi
-  if command -v systemd-sysusers >/dev/null 2>&1; then
-    if ! sudo systemd-sysusers keybackcon.conf; then
-      echo "    error: systemd-sysusers keybackcon.conf falló" >&2
-      writer_lock_ok=0
-    fi
-  else
-    echo "    aviso: systemd-sysusers no disponible; crea el grupo keybackcon a mano" >&2
-    writer_lock_ok=0
-  fi
-  if command -v systemd-tmpfiles >/dev/null 2>&1; then
-    if ! sudo systemd-tmpfiles --create keybackcon.conf; then
-      echo "    error: systemd-tmpfiles --create keybackcon.conf falló" >&2
-      writer_lock_ok=0
-    fi
-  else
-    echo "    aviso: systemd-tmpfiles no disponible; crea /run/keybackcon a mano" >&2
-    writer_lock_ok=0
-  fi
-  if [ ! -d /run/keybackcon ] || [ ! -e /run/keybackcon/writer.lock ]; then
-    echo "    error: falta /run/keybackcon/writer.lock tras tmpfiles" >&2
-    writer_lock_ok=0
-  fi
-  if [ "$writer_lock_ok" = 1 ]; then
-    echo "==> keybackcon: candado instalado (root:keybackcon 0660; dir 0770)"
-  else
-    echo "==> keybackcon: candado incompleto; sin él el CLI no escribe" >&2
-  fi
-  # Instalar ≠ autorizar: no añadimos usuarios al grupo automáticamente (KBC-01/11).
-  if id -nG "${USER}" 2>/dev/null | tr ' ' '\n' | grep -qx keybackcon; then
-    echo "==> keybackcon: ${USER} ya está en el grupo keybackcon"
-  else
-    echo "==> keybackcon: autorización de escritura pendiente"
-    echo "    Instalar no te mete en el grupo. Para poder escribir:"
-    echo "      sudo usermod -aG keybackcon ${USER}"
-    echo "    Luego cierra sesión y vuelve a entrar (o: newgrp keybackcon)."
+  force_enable="${KEYBACKCON_ENABLE_RESTORE:-0}"
+  if [ "$had_unit" = false ] || [ "$force_enable" = 1 ]; then
+    systemctl --user enable ilutex.service
+    echo "==> ilutex: restauración al login habilitada (systemctl --user enable ilutex.service)"
   fi
 fi
 
-echo "==> keybackcon: migrar estado heredado kbd-rgb (si existe)"
+echo "==> ilutex: regla udev (opcional, root)"
+if [ "${KEYBACKCON_SKIP_UDEV:-0}" = "1" ]; then
+  echo "    omitida (KEYBACKCON_SKIP_UDEV=1)"
+else
+  udev_ok=1
+  if ! sudo install -D -m644 "${REPO_DIR}/packaging/udev/70-ilutex.rules" /etc/udev/rules.d/70-ilutex.rules; then
+    echo "    error: no se pudo instalar udev/70-ilutex.rules" >&2
+    udev_ok=0
+  fi
+  if ! sudo udevadm control --reload; then
+    echo "    error: udevadm control --reload falló" >&2
+    udev_ok=0
+  fi
+  if ! sudo udevadm trigger --subsystem-match=hidraw; then
+    echo "    error: udevadm trigger falló" >&2
+    udev_ok=0
+  fi
+  if [ "$udev_ok" = 1 ]; then
+    echo "==> ilutex: regla udev instalada (root)"
+  else
+    echo "==> ilutex: regla udev incompleta" >&2
+  fi
+fi
+
+echo "==> ilutex: candado de escritura (root)"
+writer_lock_ok=1
+if ! sudo install -D -m644 "${REPO_DIR}/packaging/sysusers.d/ilutex.conf" /usr/lib/sysusers.d/ilutex.conf; then
+  echo "    error: no se pudo instalar sysusers.d/ilutex.conf" >&2
+  writer_lock_ok=0
+fi
+if ! sudo install -D -m644 "${REPO_DIR}/packaging/tmpfiles.d/ilutex.conf" /usr/lib/tmpfiles.d/ilutex.conf; then
+  echo "    error: no se pudo instalar tmpfiles.d/ilutex.conf" >&2
+  writer_lock_ok=0
+fi
+if command -v systemd-sysusers >/dev/null 2>&1; then
+  if ! sudo systemd-sysusers ilutex.conf; then
+    echo "    error: systemd-sysusers ilutex.conf falló" >&2
+    writer_lock_ok=0
+  fi
+else
+  echo "    aviso: systemd-sysusers no disponible; crea el grupo ilutex a mano" >&2
+  writer_lock_ok=0
+fi
+if command -v systemd-tmpfiles >/dev/null 2>&1; then
+  if ! sudo systemd-tmpfiles --create ilutex.conf; then
+    echo "    error: systemd-tmpfiles --create ilutex.conf falló" >&2
+    writer_lock_ok=0
+  fi
+else
+  echo "    aviso: systemd-tmpfiles no disponible; crea /run/ilutex a mano" >&2
+  writer_lock_ok=0
+fi
+if [ ! -d /run/ilutex ] || [ ! -e /run/ilutex/writer.lock ]; then
+  echo "    error: falta /run/ilutex/writer.lock tras tmpfiles" >&2
+  writer_lock_ok=0
+fi
+if [ "$writer_lock_ok" = 1 ]; then
+  echo "==> ilutex: candado instalado (root:ilutex 0660; dir 0770)"
+else
+  echo "==> ilutex: candado incompleto; sin él el CLI no escribe" >&2
+fi
+# Instalar ≠ autorizar: no añadimos usuarios al grupo automáticamente.
+if id -nG "${USER}" 2>/dev/null | tr ' ' '\n' | grep -qx ilutex; then
+  echo "==> ilutex: ${USER} ya está en el grupo ilutex"
+else
+  echo "==> ilutex: autorización de escritura pendiente"
+  echo "    Instalar no te mete en el grupo. Para poder escribir:"
+  echo "      sudo usermod -aG ilutex ${USER}"
+  echo "    Luego cierra sesión y vuelve a entrar (o: newgrp ilutex)."
+fi
+
+echo "==> ilutex: migrar estado heredado kbd-rgb/keybackcon (si existe)"
 for d in "${XDG_STATE_HOME:-${HOME}/.local/state}" "${HOME}/.local/state"; do
-  if [ -f "$d/kbd-rgb/state" ] && [ ! -f "$d/keybackcon/state" ]; then
-    mkdir -p "$d/keybackcon"
-    cp "$d/kbd-rgb/state" "$d/keybackcon/state"
-    echo "    migrado $d/kbd-rgb/state -> $d/keybackcon/state"
+  # kbd-rgb -> ilutex
+  if [ -f "$d/kbd-rgb/state" ] && [ ! -f "$d/ilutex/state" ]; then
+    mkdir -p "$d/ilutex"
+    cp "$d/kbd-rgb/state" "$d/ilutex/state"
+    echo "    migrado $d/kbd-rgb/state -> $d/ilutex/state"
+    break
+  fi
+  # keybackcon -> ilutex
+  if [ -f "$d/keybackcon/state" ] && [ ! -f "$d/ilutex/state" ]; then
+    mkdir -p "$d/ilutex"
+    cp "$d/keybackcon/state" "$d/ilutex/state"
+    echo "    migrado $d/keybackcon/state -> $d/ilutex/state"
     break
   fi
 done
 
-echo "==> keybackcon: comprobar dependencias de la GUI y la bandeja"
+echo "==> ilutex: comprobar dependencias de la GUI y la bandeja"
 tray_ok=1
 python3 -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("AyatanaAppIndicator3", "0.1"); from gi.repository import AyatanaAppIndicator3; import cairo' >/dev/null 2>&1 || tray_ok=0
 gui_ok=1
@@ -229,10 +232,10 @@ if [ "$tray_ok" = 0 ]; then
   echo "    pista: $(pkg_hint tray)" >&2
 fi
 
-if id -nG "${USER}" 2>/dev/null | tr ' ' '\n' | grep -qx keybackcon; then
-  echo "OK: keybackcon instalado. Prueba con: keybackcon info"
+if id -nG "${USER}" 2>/dev/null | tr ' ' '\n' | grep -qx ilutex; then
+  echo "OK: ilutex instalado. Prueba con: ilutex info"
 else
-  echo "OK: keybackcon instalado (binarios/udev/candado)."
-  echo "    Escritura HID pendiente de autorización (grupo keybackcon). Ver mensajes arriba."
-  echo "    Consulta sin escribir: keybackcon info"
+  echo "OK: ilutex instalado (binarios/udev/candado)."
+  echo "    Escritura HID pendiente de autorización (grupo ilutex). Ver mensajes arriba."
+  echo "    Consulta sin escribir: ilutex info"
 fi

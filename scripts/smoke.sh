@@ -7,18 +7,18 @@ say() { printf '%s\n' "$*"; }
 ok() { say "  ok: $*"; }
 bad() { say "  FALLO: $*"; fail=1; }
 
-say "==> keybackcon smoke"
-if [ ! -x "${REPO_DIR}/target/release/keybackcon" ]; then
+say "==> ilutex smoke"
+if [ ! -x "${REPO_DIR}/target/release/ilutex" ]; then
   cargo build --release --manifest-path "${REPO_DIR}/Cargo.toml" >/dev/null
 fi
 
-if "${REPO_DIR}/target/release/keybackcon" --version >/dev/null; then
+if "${REPO_DIR}/target/release/ilutex" --version >/dev/null; then
   ok "--version"
 else
   bad "--version"
 fi
 
-if { "${REPO_DIR}/target/release/keybackcon" --help 2>&1 || true; } | grep -q "brightness"; then
+if { "${REPO_DIR}/target/release/ilutex" --help 2>&1 || true; } | grep -q "brightness"; then
   ok "--help menciona brightness"
 else
   bad "--help"
@@ -32,27 +32,27 @@ fi
 
 if ! command -v desktop-file-validate >/dev/null 2>&1; then
   ok "desktop-file-validate no disponible, omitido"
-elif desktop-file-validate "${REPO_DIR}/packaging/desktop/keybackcon.desktop"; then
+elif desktop-file-validate "${REPO_DIR}/packaging/desktop/ilutex.desktop"; then
   ok "desktop válido"
 else
   bad "desktop"
 fi
 
-if grep -q 'TAG+="uaccess"' "${REPO_DIR}/packaging/udev/70-keybackcon.rules"; then
+if grep -q 'TAG+="uaccess"' "${REPO_DIR}/packaging/udev/70-ilutex.rules"; then
   ok "udev uaccess"
 else
   bad "udev"
 fi
 
-if grep -q '/run/keybackcon/writer.lock' "${REPO_DIR}/packaging/tmpfiles.d/keybackcon.conf" \
-  && grep -q '^g keybackcon' "${REPO_DIR}/packaging/sysusers.d/keybackcon.conf"; then
+if grep -q '/run/ilutex/writer.lock' "${REPO_DIR}/packaging/tmpfiles.d/ilutex.conf" \
+  && grep -q '^g ilutex' "${REPO_DIR}/packaging/sysusers.d/ilutex.conf"; then
   ok "candado tmpfiles/sysusers"
 else
   bad "candado tmpfiles/sysusers"
 fi
 
 # Instalar ≠ autorizar (KBC-01/11): no invocar usermod (documentarlo en echo sí vale).
-if ! grep -E 'usermod[[:space:]]+-aG[[:space:]]+keybackcon' \
+if ! grep -E 'usermod[[:space:]]+-aG[[:space:]]+ilutex' \
       "${REPO_DIR}/scripts/install.sh" "${REPO_DIR}/packaging/debian/postinst" \
     | grep -vE 'echo |# ' | grep -q .; then
   ok "install/postinst sin usermod automático"
@@ -66,20 +66,20 @@ else
   bad "install.sh sin mensaje de habilitación explícita"
 fi
 
-if grep -q "ExecStart=/usr/bin/keybackcon restore" "${REPO_DIR}/packaging/systemd/keybackcon.service"; then
+if grep -q "ExecStart=/usr/bin/ilutex restore" "${REPO_DIR}/packaging/systemd/ilutex.service"; then
   ok "systemd service (/usr/bin)"
 else
   bad "systemd"
 fi
 
-if grep -q "ExecStart=/usr/bin/keybackcon animation" "${REPO_DIR}/packaging/systemd/keybackcon-animation@.service" \
-  && grep -q "ExecStopPost=/usr/bin/keybackcon stop" "${REPO_DIR}/packaging/systemd/keybackcon-animation@.service"; then
+if grep -q "ExecStart=/usr/bin/ilutex animation" "${REPO_DIR}/packaging/systemd/ilutex-animation@.service" \
+  && grep -q "ExecStopPost=/usr/bin/ilutex stop" "${REPO_DIR}/packaging/systemd/ilutex-animation@.service"; then
   ok "systemd anim (/usr/bin, stop restaura color)"
 else
   bad "systemd anim"
 fi
 
-if grep -q 's|/usr/bin/keybackcon|%h/.local/bin/keybackcon|g' "${REPO_DIR}/scripts/install.sh"; then
+if grep -q '__KEYBACKCON_BIN__' "${REPO_DIR}/scripts/install.sh"; then
   ok "install.sh reescribe unidades a ~/.local/bin"
 else
   bad "install.sh reescritura de unidades"
@@ -102,8 +102,8 @@ fi
 if (
   cd "${REPO_DIR}" && python3 -c '
 from gui.client import udev_install_argv
-src = "/tmp/home with spaces/70-keybackcon.rules; rm -rf /"
-dst = "/etc/udev/rules.d/70-keybackcon.rules"
+src = "/tmp/home with spaces/70-ilutex.rules; rm -rf /"
+dst = "/etc/udev/rules.d/70-ilutex.rules"
 argv = udev_install_argv(src, dst)
 assert argv[:3] == ["pkexec", "sh", "-c"]
 assert "$1" in argv[3] and "$2" in argv[3]
@@ -116,7 +116,7 @@ else
   bad "udev_install_argv"
 fi
 
-if [ -f "${REPO_DIR}/assets/icons/keybackcon.svg" ]; then
+if [ -f "${REPO_DIR}/assets/icons/ilutex.svg" ]; then
   ok "icono"
 else
   bad "icono"
@@ -143,13 +143,13 @@ else
   bad "tests unitarios GUI"
 fi
 
-if python3 -c 'import sys; from xml.dom import minidom; minidom.parse(sys.argv[1])' "${REPO_DIR}/gui/org.iniciativas.keybackcon.gschema.xml"; then
+if python3 -c 'import sys; from xml.dom import minidom; minidom.parse(sys.argv[1])' "${REPO_DIR}/gui/org.alexendros.ilutex.gschema.xml"; then
   ok "schema XML válido (minidom)"
 else
   bad "schema XML"
 fi
 if command -v xmllint >/dev/null 2>&1; then
-  if xmllint --noout "${REPO_DIR}/gui/org.iniciativas.keybackcon.gschema.xml"; then
+  if xmllint --noout "${REPO_DIR}/gui/org.alexendros.ilutex.gschema.xml"; then
     ok "schema XML válido (xmllint)"
   else
     bad "schema xmllint"

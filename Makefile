@@ -1,10 +1,10 @@
-.PHONY: lint test smoke build validate help i18n check-i18n
+.PHONY: lint test smoke build validate help i18n check-i18n check-version
 
 CARGO := cargo
 VERSION := $(shell sed -nE 's/^version *= *"([^"]+)".*/\1/p' Cargo.toml | head -1)
 PO_FILES := $(wildcard po/*.po)
 XGETTEXT_FLAGS := --language=Python --keyword=_ --keyword=N_ --from-code=UTF-8 \
-	--add-comments=TRANSLATORS --package-name=keybackcon \
+	--add-comments=TRANSLATORS --package-name=ilutex \
 	--package-version=$(VERSION) --msgid-bugs-address=https://github.com/Soluciones-Alexendros/keybackcon/issues
 
 ##@ Calidad
@@ -24,7 +24,10 @@ smoke: ## Binario, GUI y packaging
 build: ## Binario release (artefacto)
 	$(CARGO) build --release
 
-validate: lint test smoke ## Fachada local = quality + test + smoke
+check-version: ## Verifica paridad Cargo npm tag CHANGELOG
+	bash scripts/check-version.sh
+
+validate: lint test smoke check-version ## Fachada local = quality + test + smoke + version
 
 i18n: ## Regenera po/keybackcon.pot y compila los .mo en gui/locale
 	xgettext $(XGETTEXT_FLAGS) --output=po/keybackcon.pot gui/*.py
@@ -32,7 +35,7 @@ i18n: ## Regenera po/keybackcon.pot y compila los .mo en gui/locale
 	msgmerge --quiet --update --backup=none po/en.po po/keybackcon.pot
 	@for po in $(PO_FILES); do \
 	  lang=$$(basename "$$po" .po); \
-	  dst="gui/locale/$$lang/LC_MESSAGES/keybackcon.mo"; \
+	  dst="gui/locale/$$lang/LC_MESSAGES/ilutex.mo"; \
 	  mkdir -p "$$(dirname "$$dst")"; \
 	  msgfmt -c -o "$$dst" "$$po" && echo "    $$lang -> $$dst"; \
 	done

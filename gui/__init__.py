@@ -31,7 +31,7 @@ def log_exc(contexto):
     tipo, exc, _tb = sys.exc_info()
     if tipo is None:
         return
-    print(f"keybackcon-gui: {contexto}: {tipo.__name__}: {exc}", file=sys.stderr)
+    print(f"ilutex-gui: {contexto}: {tipo.__name__}: {exc}", file=sys.stderr)
 
 
 def load(nombre):
@@ -92,7 +92,7 @@ def ensure_package(script_file=None):
         spec.loader.exec_module(module)
         return True
     except Exception:
-        print("keybackcon-gui: no se pudo cargar el paquete gui", file=sys.stderr)
+        print("ilutex-gui: no se pudo cargar el paquete gui", file=sys.stderr)
         return False
 
 

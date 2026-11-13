@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.iniciativas.keybackcon" path="/org/iniciativas/keybackcon/">
+  <schema id="org.alexendros.ilutex" path="/org/alexendros/ilutex/">
     <key name="theme" type="s">
       <default>'system'</default>
       <summary>Interface theme</summary>

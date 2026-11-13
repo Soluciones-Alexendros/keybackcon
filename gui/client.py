@@ -21,6 +21,8 @@ _ = _gettext_func()
 
 def find_binary():
     for cand in (
+        shutil.which("ilutex"),
+        os.path.expanduser("~/.local/bin/ilutex"),
         shutil.which("keybackcon"),
         os.path.expanduser("~/.local/bin/keybackcon"),
         shutil.which("kbd-rgb"),
@@ -28,7 +30,7 @@ def find_binary():
     ):
         if cand and os.path.isfile(cand) and os.access(cand, os.X_OK):
             return cand
-    return "keybackcon"
+    return "ilutex"
 
 
 def udev_install_argv(src: str, dst: str) -> list[str]:
@@ -67,8 +69,8 @@ def state_paths() -> tuple[str, str] | None:
             return None
         base = os.path.join(home, ".local/state")
     return (
+        os.path.join(base, "ilutex/state"),
         os.path.join(base, "keybackcon/state"),
-        os.path.join(base, "kbd-rgb/state"),
     )
 
 
@@ -156,8 +158,9 @@ def parse_state_text(raw: str) -> tuple[str, object]:
 def pid_paths():
     base = _absolute_or_none(os.environ.get("XDG_RUNTIME_DIR"))
     if base is None:
-        base = f"/tmp/keybackcon-{os.getuid()}"
+        base = f"/tmp/ilutex-{os.getuid()}"
     return (
+        os.path.join(base, "ilutex/animation.pid"),
         os.path.join(base, "keybackcon/animation.pid"),
         os.path.join(base, "keybackcon/anim.pid"),
         os.path.join(base, "kbd-rgb/anim.pid"),

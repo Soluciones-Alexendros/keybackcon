@@ -1,0 +1,12 @@
+[Unit]
+Description=iLutex animation (%i)
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ilutex animation %i
+ExecStopPost=/usr/bin/ilutex stop
+Restart=no
+Nice=10
+
+[Install]
+WantedBy=default.target

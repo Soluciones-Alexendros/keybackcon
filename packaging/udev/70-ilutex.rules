@@ -1,0 +1,3 @@
+# AERO X16 1VH — teclado RGB (0414:8104).
+# Da acceso al hidraw del LampArray al usuario de la sesión activa.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0414", ATTRS{idProduct}=="8104", TAG+="uaccess"

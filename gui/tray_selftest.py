@@ -525,7 +525,7 @@ def expected_png(color_hex, mode):
         d = tray_mod._cache_dir()
     except Exception:
         base = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-        d = os.path.join(base, "keybackcon")
+        d = os.path.join(base, "ilutex")
     try:
         ch = tray_mod._normalize_hex(color_hex)
     except Exception:

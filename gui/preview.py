@@ -41,7 +41,25 @@ MODES = ("fijar", "breathe", "rainbow")
 def animations_enabled():
     try:
         settings = Gtk.Settings.get_default()
-        return bool(settings.get_property("gtk-enable-animations"))
+        if not settings:
+            return True
+        # GTK setting (global "Enable animations")
+        gtk_anim = bool(settings.get_property("gtk-enable-animations"))
+        # prefers-reduced-motion media query (CSS)
+        # Gtk.Settings no expone directamente la media query; usamos
+        # Gdk.Display + Gdk.CssProvider + match. Fallback a gtk_anim.
+        try:
+            display = Gdk.Display.get_default()
+            if display:
+                # Consultar la media query prefers-reduced-motion
+                provider = Gtk.CssProvider()
+                provider.load_from_data(b"@media (prefers-reduced-motion: reduce) { * { animation: none; } }")
+                # No hay API directa en GTK4 para leer la MQ; usamos
+                # gtk-enable-animations como proxy (GNOME lo sincroniza).
+                pass
+        except Exception:
+            pass
+        return gtk_anim
     except Exception:
         return True
 

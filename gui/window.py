@@ -34,6 +34,8 @@ StagePreview = _preview_mod.StagePreview
 mode_label = _preview_mod.mode_label
 _theme = load("theme")
 apply_saved_theme = _theme.apply_saved_theme
+get_omarchy_accent = _theme.get_omarchy_accent
+on_accent_changed = _theme.on_accent_changed
 try:
     _settings = load("settings")
     SettingsDialog = _settings.SettingsDialog
@@ -62,11 +64,13 @@ from gui.constants import (
     MIN_WINDOW_HEIGHT,
     BRIGHTNESS_DEBOUNCE_MS,
     STATE_POLL_SECONDS,
+    OMARCHY_COLORS_TOML,
+    OMARCHY_ACCENT_FALLBACK,
 )
 
 
-APP_ID = "org.iniciativas.keybackcon"
-APP_TITLE = "Keyboard Backlight Controls"
+APP_ID = "org.alexendros.ilutex"
+APP_TITLE = "iLutex"
 ESTADO_SIN_TECLADO = {}
 
 
@@ -76,6 +80,10 @@ BASE_CSS = """
   font-feature-settings: 'tnum';
   font-size: 12px;
   color: alpha(@window_fg_color, 0.75);
+}
+.section-hint {
+  font-size: 12px;
+  color: alpha(@window_fg_color, 0.85);  /* WCAG AA contraste */
 }
 .preview-card {
   background-color: @card_bg_color;
@@ -87,6 +95,11 @@ BASE_CSS = """
   min-width: 40px;
   min-height: 40px;
   padding: 0;
+}
+.sw-follow {
+  /* Sigue el acento de Omarchy, que _accent_css reescribe en vivo. */
+  background-color: @accent_color;
+  box-shadow: inset 0 0 0 1px alpha(@window_fg_color, 0.35);
 }
 .swatch-btn.selected {
   border-color: @accent_color;
@@ -112,16 +125,32 @@ def _swatch_css():
     return "\n".join(parts)
 
 
-def _full_css():
-    return BASE_CSS + "\n" + _swatch_css()
+def _accent_css(accent):
+    """CSS que fija el acento de Omarchy sobre el color de Adwaita."""
+    return (
+        f"@define-color accent_color {accent};\n"
+        f"@define-color accent_bg_color {accent};\n"
+    )
 
 
-def _ensure_css():
-    global _CSS_PROVIDER, _CSS_LOADED
-    if _CSS_LOADED and _CSS_PROVIDER is not None:
+_CURRENT_ACCENT = None
+
+
+def _full_css(accent=None):
+    parts = []
+    if accent:
+        parts.append(_accent_css(accent))
+    parts.append(BASE_CSS)
+    parts.append(_swatch_css())
+    return "\n".join(parts)
+
+
+def _ensure_css(accent=None):
+    global _CSS_PROVIDER, _CSS_LOADED, _CURRENT_ACCENT
+    if _CSS_LOADED and _CSS_PROVIDER is not None and accent == _CURRENT_ACCENT:
         return _CSS_PROVIDER
     provider = Gtk.CssProvider()
-    provider.load_from_data(_full_css().encode())
+    provider.load_from_data(_full_css(accent).encode())
     try:
         display = Gdk.Display.get_default()
         if display is not None:
@@ -130,6 +159,7 @@ def _ensure_css():
         log_exc("CSS")
     _CSS_PROVIDER = provider
     _CSS_LOADED = True
+    _CURRENT_ACCENT = accent
     return provider
 
 
@@ -169,7 +199,7 @@ class MesaWindow(Adw.ApplicationWindow):
     def __init__(self, app, client=None, on_preferences=None, hide_on_close=False):
         super().__init__(application=app)
         apply_saved_theme()
-        self.set_title("keybackcon")
+        self.set_title(APP_TITLE)
         self.set_default_size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         self.set_size_request(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         self._hide_on_close = hide_on_close
@@ -195,7 +225,16 @@ class MesaWindow(Adw.ApplicationWindow):
             log_exc("efectos")
         self._bright_source = None
         self.swatch_buttons = {}
-        _ensure_css()
+        self._accent = get_omarchy_accent()
+        _ensure_css(self._accent)
+        # El acento de Omarchy se vigila en vivo (cambio de tema sin reiniciar).
+        try:
+            self._accent_unregister = on_accent_changed(self._on_accent_changed)
+        except Exception:
+            log_exc("vigilancia del acento")
+            self._accent_unregister = None
+        # Referencias para re-traducir en vivo (L2).
+        self._retranslate_refs = []
         self.toast_overlay = Adw.ToastOverlay()
         self.set_content(self.toast_overlay)
         toolbar = Adw.ToolbarView()
@@ -205,6 +244,13 @@ class MesaWindow(Adw.ApplicationWindow):
         self.status_dot = Gtk.Label(label="●")
         self.status_text = Gtk.Label(label=_("looking at the keyboard…"))
         self.status_text.add_css_class("mono-font")
+        # Live region para lectores de pantalla (ATK role=status, aria-live=polite)
+        try:
+            self.status_text.update_property(
+                (Gtk.AccessibleProperty.LIVE,), (Gtk.AccessibleLiveRegion.POLITE,)
+            )
+        except Exception:
+            log_exc("live region status")
         pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         pill.append(self.status_dot)
         pill.append(self.status_text)
@@ -212,6 +258,7 @@ class MesaWindow(Adw.ApplicationWindow):
         prefs_button = Gtk.Button.new_from_icon_name("preferences-system-symbolic")
         prefs_button.set_tooltip_text(_("Preferences"))
         prefs_button.connect("clicked", self._on_preferences_clicked)
+        self._prefs_button = prefs_button
         header.pack_end(prefs_button)
         toolbar.add_top_bar(header)
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
@@ -256,13 +303,29 @@ class MesaWindow(Adw.ApplicationWindow):
             title=_("How it moves"),
             description=_("Hold the light steady or let it breathe."),
         )
+        self._g_mov = g_mov
         seg = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         seg.add_css_class("linked")
         seg.set_homogeneous(True)
         self.seg_buttons = {}
+        radio_group = None
         for key, label in (("fijar", _("Steady")), ("breathe", _("Breathe")), ("rainbow", _("Rainbow"))):
             b = Gtk.ToggleButton(label=label)
             b.set_hexpand(True)
+            # Radio group ATK para lectores de pantalla
+            try:
+                b.update_property(
+                    (Gtk.AccessibleProperty.ROLE, Gtk.AccessibleProperty.CHECKED),
+                    (Gtk.AccessibleRole.RADIO, False),
+                )
+                if radio_group is None:
+                    radio_group = b.get_accessible()
+                else:
+                    b.get_accessible().set_relation(
+                        Gtk.AccessibleRelation.CONTROLLER_FOR, [radio_group]
+                    )
+            except Exception:
+                log_exc("radio group a11y")
             seg.append(b)
             self.seg_buttons[key] = b
         g_mov.add(seg)
@@ -277,9 +340,11 @@ class MesaWindow(Adw.ApplicationWindow):
             title=_("How much light you want"),
             description=_("Slide or use − / + . It saves itself."),
         )
+        self._g_bright = g_bright
         brow = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         minus = Gtk.Button(label="−")
         minus.connect("clicked", self._on_bright_step, -1)
+        self._minus_btn = minus
         brow.append(minus)
         self._syncing_bright = False
         self._syncing_mode = False
@@ -297,11 +362,20 @@ class MesaWindow(Adw.ApplicationWindow):
         except Exception:
             log_exc("accesible del brillo")
         self.bright_scale.connect("value-changed", self._on_bright_scale)
+        # Actualizar VALUE_TEXT dinámicamente para lectores de pantalla
+        def _on_bright_scale_a11y(scale, _pspec=None):
+            try:
+                val = int(scale.get_value())
+                scale.update_property((Gtk.AccessibleProperty.VALUE_TEXT,), (f"{val} %",))
+            except Exception:
+                pass
+        self.bright_scale.connect("notify::value", _on_bright_scale_a11y)
         brow.append(self.bright_scale)
         minus.set_tooltip_text(_("Lower brightness"))
         plus = Gtk.Button(label="+")
         plus.set_tooltip_text(_("Raise brightness"))
         plus.connect("clicked", self._on_bright_step, 1)
+        self._plus_btn = plus
         brow.append(plus)
         self.bright_value = Gtk.Label(label=f"{self.cur_pct}%")
         self.bright_value.add_css_class("mono-font")
@@ -314,12 +388,15 @@ class MesaWindow(Adw.ApplicationWindow):
             title=_("Choose your light"),
             description=_("Tap a filter or create your own shade."),
         )
+        self._g_color = g_color
         flow = Gtk.FlowBox()
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
         flow.set_homogeneous(True)
         flow.set_max_children_per_line(6)
         flow.set_row_spacing(10)
         flow.set_column_spacing(10)
+        flow.set_focusable(True)  # Navegación por teclado (Tab + flechas)
+        flow.set_can_focus(True)
         for nombre, hexv in COLORES:
             btn = Gtk.Button()
             btn.set_tooltip_text(f"{_(nombre)} · #{hexv}")
@@ -334,6 +411,29 @@ class MesaWindow(Adw.ApplicationWindow):
             btn.connect("clicked", self._on_color, hexv, nombre)
             flow.append(btn)
             self.swatch_buttons[hexv] = btn
+        # Filtro «Seguir escritorio»: usa el acento de Omarchy en vivo.
+        self._follow_btn = None
+        try:
+            follow = Gtk.Button()
+            follow_name = N_("Follow desktop")
+            follow.set_tooltip_text(f"{_(follow_name)} · {self._accent}")
+            follow.set_accessible_role(Gtk.AccessibleRole.BUTTON)
+            follow.update_property(
+                (Gtk.AccessibleProperty.LABEL,),
+                (f"{_(follow_name)} · {self._accent}",),
+            )
+            follow.add_css_class("swatch-btn")
+            follow.set_size_request(40, 40)
+            follow.add_css_class("sw-follow")
+            follow.connect("clicked", self._on_follow_desktop, follow_name)
+            flow.append(follow)
+            self._follow_btn = follow
+        except Exception:
+            log_exc("filtro seguir escritorio")
+        # Navegación por teclado en FlowBox (flechas)
+        key_nav = Gtk.EventControllerKey()
+        key_nav.connect("key-pressed", self._on_flowbox_key)
+        flow.add_controller(key_nav)
         # Los widgets que no son filas se añaden en PreferencesGroup *tras*
         # la ListBox de filas: envolvemos el FlowBox en una PreferencesRow
         # para que los filtros queden por encima de "Tono personalizado".
@@ -346,6 +446,7 @@ class MesaWindow(Adw.ApplicationWindow):
         flow_row.set_child(flow)
         g_color.add(flow_row)
         custom_row = Adw.ActionRow(title=_("Custom shade"))
+        self._custom_row = custom_row
         try:
             dlg = Gtk.ColorDialog()
             self.custom_btn = Gtk.ColorDialogButton(dialog=dlg)
@@ -370,6 +471,15 @@ class MesaWindow(Adw.ApplicationWindow):
         self._refresh_caption()
         self._refresh_status()
         self._setup_state_watch()
+        # Re-traducción en vivo cuando Omarchy cambia de idioma (L2).
+        try:
+            self._lang_unregister = self._i18n().on_language_changed(
+                self._on_omarchy_language_changed
+            )
+            self._i18n().watch_language()
+        except Exception:
+            log_exc("vigilancia de idioma")
+            self._lang_unregister = None
         try:
             from gui.backend import BackendQueue
             self._backend = BackendQueue(self._client)
@@ -379,6 +489,85 @@ class MesaWindow(Adw.ApplicationWindow):
         threading.Thread(target=self._arranque_info, daemon=True).start()
 
     # --- construcción auxiliar -------------------------------------------
+
+    def _i18n(self):
+        """Módulo de i18n (perezoso: `load` no se llama al importar)."""
+        return load("i18n")
+
+    def _on_omarchy_language_changed(self, _lang):
+        """Omarchy cambió de idioma: re-traduce la ventana sin reiniciar."""
+        self._retranslate()
+
+    def _retranslate(self):
+        """Reconstruye todas las cadenas visibles con el idioma activo."""
+        # El `_` del módulo se rebindó en i18n.set_language; refrescamos el local.
+        global _
+        try:
+            _ = self._i18n()._
+        except Exception:
+            log_exc("rebind gettext")
+            return
+        try:
+            self.set_title(APP_TITLE)
+            self._prefs_button.set_tooltip_text(_("Preferences"))
+            self._g_mov.set_title(_("How it moves"))
+            self._g_mov.set_description(
+                _("Hold the light steady or let it breathe.")
+            )
+            self._g_bright.set_title(_("How much light you want"))
+            self._g_bright.set_description(
+                _("Slide or use − / + . It saves itself.")
+            )
+            self._g_color.set_title(_("Choose your light"))
+            self._g_color.set_description(
+                _("Tap a filter or create your own shade.")
+            )
+            self._custom_row.set_title(_("Custom shade"))
+            self.stop_btn.set_label(_("Stop motion"))
+            self._minus_btn.set_tooltip_text(_("Lower brightness"))
+            self._plus_btn.set_tooltip_text(_("Raise brightness"))
+            for key, label in (
+                ("fijar", _("Steady")),
+                ("breathe", _("Breathe")),
+                ("rainbow", _("Rainbow")),
+            ):
+                self.seg_buttons[key].set_label(label)
+            # Filtros de color: nombre traducido en el punto de uso.
+            for nombre, hexv in COLORES:
+                btn = self.swatch_buttons.get(hexv)
+                if btn is None:
+                    continue
+                btn.set_tooltip_text(f"{_(nombre)} · #{hexv}")
+                try:
+                    btn.update_property(
+                        (Gtk.AccessibleProperty.LABEL,),
+                        (f"{_(nombre)} · #{hexv}",),
+                    )
+                except Exception:
+                    log_exc("accesible del filtro")
+            if self._follow_btn is not None:
+                nombre_follow = _("Follow desktop")
+                self._follow_btn.set_tooltip_text(
+                    f"{nombre_follow} · {self._accent}"
+                )
+                try:
+                    self._follow_btn.update_property(
+                        (Gtk.AccessibleProperty.LABEL,),
+                        (f"{nombre_follow} · {self._accent}",),
+                    )
+                except Exception:
+                    log_exc("accesible seguir escritorio")
+            try:
+                self.bright_scale.update_property(
+                    (Gtk.AccessibleProperty.LABEL,),
+                    (_("Brightness"),),
+                )
+            except Exception:
+                log_exc("accesible del brillo")
+            self._refresh_caption()
+            self._refresh_status()
+        except Exception:
+            log_exc("re-traducir")
 
     def _section(self, title, hint):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -596,10 +785,30 @@ class MesaWindow(Adw.ApplicationWindow):
 
     def _mark_selected(self):
         for hexv, btn in self.swatch_buttons.items():
-            if hexv == self.cur_color:
+            if hexv == self.cur_color and not getattr(self, "_follow_color", False):
                 btn.add_css_class("selected")
             else:
                 btn.remove_css_class("selected")
+        follow = getattr(self, "_follow_btn", None)
+        if follow is not None:
+            if getattr(self, "_follow_color", False):
+                follow.add_css_class("selected")
+            else:
+                follow.remove_css_class("selected")
+
+    def _on_accent_changed(self, accent):
+        """Se llama cuando Omarchy cambia de tema: re-aplica el acento en vivo."""
+        if not accent or accent == getattr(self, "_accent", None):
+            return
+        self._accent = accent
+        try:
+            _ensure_css(accent)
+            self.queue_draw()
+            if hasattr(self, "swatch_buttons"):
+                for btn in self.swatch_buttons.values():
+                    btn.queue_draw()
+        except Exception:
+            log_exc("aplicar acento nuevo")
 
     def _refresh_caption(self):
         name = next((n for n, h in COLORES if h == self.cur_color), N_("Your shade"))
@@ -616,6 +825,25 @@ class MesaWindow(Adw.ApplicationWindow):
     # --- eventos de la UI -------------------------------------------------
 
     def _on_color(self, _btn, hexv, nombre):
+        self._follow_color = False
+        self.cur_color = hexv
+        self._preview.reset_clock()
+        self._color_pendiente = hexv
+        try:
+            self._client.stop_animation()
+        except Exception:
+            log_exc("parar animación")
+        try:
+            if self._run_set(hexv, _("{nombre} applied").format(nombre=_(nombre))):
+                self._mark_selected()
+                self._refresh_caption()
+        finally:
+            self._color_pendiente = None
+
+    def _on_follow_desktop(self, _btn, nombre):
+        """Aplica el acento de Omarchy como color del teclado."""
+        hexv = (self._accent or OMARCHY_ACCENT_FALLBACK).lstrip("#").lower()
+        self._follow_color = True
         self.cur_color = hexv
         self._preview.reset_clock()
         self._color_pendiente = hexv
@@ -753,6 +981,104 @@ class MesaWindow(Adw.ApplicationWindow):
         if name in ("minus", "KP_Subtract"):
             self._on_bright_step(None, -1)
             return True
+        # Ayuda de atajos (K1): `?` (y shift+slash).
+        if name in ("question", "slash") and (
+            name == "question" or state & Gdk.ModifierType.SHIFT_MASK
+        ):
+            self._show_shortcuts()
+            return True
+        # Salir (K2): `Q` avisa si hay trabajo sin aplicar.
+        if name in ("q", "Q") and not (state & Gdk.ModifierType.CONTROL_MASK):
+            self._request_quit()
+            return True
+        # Acción principal (K2): Enter/Espacio aplican «Fijar».
+        if name in ("Return", "KP_Enter", "space"):
+            self._apply_steady()
+            return True
+        return False
+
+    def _has_pending_work(self):
+        """True si hay algo sin aplicar en el teclado."""
+        if getattr(self, "_color_pendiente", None) is not None:
+            return True
+        if getattr(self, "_bright_source", None) is not None:
+            return True
+        return False
+
+    def _request_quit(self):
+        """`Q`: cerrar, preguntando antes si hay trabajo pendiente (K2)."""
+        if not self._has_pending_work():
+            self.close()
+            return
+        dlg = Adw.AlertDialog.new(
+            _("Leave iLutex?"),
+            _("There is a change still on its way to the keyboard."),
+        )
+        dlg.add_response("cancel", _("Stay"))
+        dlg.add_response("quit", _("Leave"))
+        dlg.set_default_response("cancel")
+        dlg.set_close_response("cancel")
+        dlg.connect("response", self._on_quit_response)
+        dlg.present(self)
+
+    def _on_quit_response(self, _dlg, response):
+        if response == "quit":
+            self.close()
+
+    def _apply_steady(self):
+        """Acción principal: fijar el color actual sin animación."""
+        if self._has_pending_work():
+            return
+        nombre = next(
+            (n for n, h in COLORES if h == self.cur_color), N_("Your shade")
+        )
+        self._on_color(None, self.cur_color, nombre)
+
+    def _show_shortcuts(self):
+        """Overlay `?` con la tabla de atajos (K1)."""
+        rows = [
+            (_("Stay here"), "? / Shift + / "),
+            (_("Leave"), "Q"),
+            (_("Apply steady light"), "Enter / Space"),
+            (_("Pick a filter"), "Ctrl + 1…9"),
+            (_("Brush the light up or down"), "+ / −"),
+            (_("Navigate the filters"), _("Arrow keys")),
+        ]
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_margin_top(20)
+        box.set_margin_bottom(20)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        title = Gtk.Label(label=_("Keyboard shortcuts"))
+        title.add_css_class("title-2")
+        title.set_xalign(0)
+        box.append(title)
+        grid = Gtk.Grid(row_spacing=8, column_spacing=24)
+        for i, (accion, atajo) in enumerate(rows):
+            lbl_accion = Gtk.Label(label=accion)
+            lbl_accion.set_xalign(0)
+            lbl_accion.set_hexpand(True)
+            lbl_atajo = Gtk.Label(label=atajo)
+            lbl_atajo.add_css_class("mono-font")
+            lbl_atajo.set_xalign(1)
+            grid.attach(lbl_accion, 0, i, 1, 1)
+            grid.attach(lbl_atajo, 1, i, 1, 1)
+        box.append(grid)
+        dlg = Adw.Dialog()
+        dlg.set_title(_("Keyboard shortcuts"))
+        dlg.set_content_width(360)
+        dlg.set_child(box)
+        dlg.present(self)
+        self._shortcuts_dialog = dlg
+
+    def _on_flowbox_key(self, _ctl, keyval, _keycode, _state):
+        """Navegación por flechas en el FlowBox de filtros."""
+        name = Gdk.keyval_name(keyval)
+        if name not in ("Up", "Down", "Left", "Right", "Home", "End"):
+            return False
+        # Delegar al FlowBox (GTK maneja la navegación interna)
+        # El controller está en el FlowBox, así que no hacemos nada aquí.
+        # GTK4 FlowBox con focusable=True ya maneja flechas nativamente.
         return False
 
     def _on_stage_hide(self, *args):

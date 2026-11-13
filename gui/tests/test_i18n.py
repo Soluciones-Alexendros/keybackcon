@@ -10,13 +10,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 LOCALE_DIR = os.path.join(ROOT, "gui", "locale")
 POT = os.path.join(ROOT, "po", "keybackcon.pot")
 
-
 def _catalogo(lang):
     """Traducción compilada del repo; salta si falta el `.mo` (`make i18n`)."""
-    mo = os.path.join(LOCALE_DIR, lang, "LC_MESSAGES", "keybackcon.mo")
+    mo = os.path.join(LOCALE_DIR, lang, "LC_MESSAGES", "ilutex.mo")
     if not os.path.isfile(mo):
         raise unittest.SkipTest(f"catálogo ausente: {mo}; ejecuta `make i18n`")
-    return gettext.translation("keybackcon", localedir=LOCALE_DIR, languages=[lang])
+    return gettext.translation("ilutex", localedir=LOCALE_DIR, languages=[lang])
 
 
 def _requiere_catalogo(lang):
@@ -40,10 +39,64 @@ class TestI18n(unittest.TestCase):
         self.assertEqual(i18n.setup_i18n("fr"), "es")
 
     def test_nulo_usa_el_locale_del_sistema(self):
-        with mock.patch("gui.i18n.locale.getdefaultlocale", return_value=("en_US", "UTF-8")):
+        # Sin Omarchy presente, la fuente es el locale del sistema.
+        with mock.patch.object(
+            i18n, "omarchy_language_file", return_value="/no/existe/language"
+        ), mock.patch(
+            "gui.i18n.locale.getdefaultlocale", return_value=("en_US", "UTF-8")
+        ):
             self.assertEqual(i18n.setup_i18n(None), "en")
-        with mock.patch("gui.i18n.locale.getdefaultlocale", return_value=(None, None)):
+        with mock.patch.object(
+            i18n, "omarchy_language_file", return_value="/no/existe/language"
+        ), mock.patch("gui.i18n.locale.getdefaultlocale", return_value=(None, None)):
             self.assertEqual(i18n.setup_i18n(None), "es")
+
+    def test_omarchy_language_tiene_prioridad(self):
+        import tempfile
+
+        with tempfile.NamedTemporaryFile("w", suffix="lang", delete=False) as f:
+            f.write("es-MX\n")
+            path = f.name
+        try:
+            with mock.patch.object(
+                i18n, "omarchy_language_file", return_value=path
+            ), mock.patch(
+                "gui.i18n.locale.getdefaultlocale", return_value=("en_US", "UTF-8")
+            ):
+                self.assertEqual(i18n.setup_i18n(None), "es")
+        finally:
+            os.unlink(path)
+
+    def test_omarchy_language_vacio_cae_al_locale(self):
+        import tempfile
+
+        with tempfile.NamedTemporaryFile("w", suffix="lang", delete=False) as f:
+            f.write("   \n")
+            path = f.name
+        try:
+            with mock.patch.object(
+                i18n, "omarchy_language_file", return_value=path
+            ), mock.patch(
+                "gui.i18n.locale.getdefaultlocale", return_value=("en_US", "UTF-8")
+            ):
+                self.assertEqual(i18n.setup_i18n(None), "en")
+        finally:
+            os.unlink(path)
+
+    def test_resolve_language_explicito_gana(self):
+        self.assertEqual(i18n.resolve_language("en"), "en")
+        self.assertEqual(i18n.resolve_language("fr"), "es")
+
+    def test_callbacks_de_idioma_registran_y_desregistran(self):
+        recibidos = []
+        unregister = i18n.on_language_changed(recibidos.append)
+        try:
+            i18n._notify_language("en")
+            self.assertEqual(recibidos, ["en"])
+        finally:
+            unregister()
+        i18n._notify_language("es")
+        self.assertEqual(recibidos, ["en"])
 
     def test_normalize_code_directo(self):
         self.assertEqual(i18n._normalize_code("EN-gb"), "en")

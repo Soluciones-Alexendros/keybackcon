@@ -1,5 +1,7 @@
 """Constantes compartidas de la GUI (evita duplicación con Rust y entre módulos Python)."""
 
+import os
+
 # Paso de brillo para teclas +/-, rueda y botones.
 BRILLO_PASO = 5
 
@@ -30,6 +32,11 @@ COLORS_PER_ROW = 6
 STATE_POLL_SECONDS = 2
 BRIGHTNESS_DEBOUNCE_MS = 150
 TRAY_TICK_SECONDS = 2
+
+# Omarchy
+OMARCHY_THEME_DIR = os.path.join(os.path.expanduser("~/.local/state/omarchy/current"))
+OMARCHY_COLORS_TOML = os.path.join(OMARCHY_THEME_DIR, "theme", "colors.toml")
+OMARCHY_ACCENT_FALLBACK = "#FFD60A"
 
 # CSS
 CSS_PRIORITY = "APPLICATION"

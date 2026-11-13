@@ -73,8 +73,8 @@ class TestRutas(unittest.TestCase):
             assert rutas is not None
             nuevo, legado = rutas
             self.assertTrue(nuevo.startswith(env.tmp))
-            self.assertTrue(nuevo.endswith("keybackcon/state"))
-            self.assertTrue(legado.endswith("kbd-rgb/state"))
+            self.assertTrue(nuevo.endswith("ilutex/state"))
+            self.assertTrue(legado.endswith("keybackcon/state"))
         finally:
             env.restaurar()
 
@@ -98,8 +98,8 @@ class TestRutas(unittest.TestCase):
         try:
             paths = pid_paths()
             self.assertTrue(paths[0].startswith(env.tmp))
-            self.assertTrue(paths[0].endswith("keybackcon/animation.pid"))
-            self.assertEqual(len(paths), 3)
+            self.assertTrue(paths[0].endswith("ilutex/animation.pid"))
+            self.assertEqual(len(paths), 4)
         finally:
             env.restaurar()
 
@@ -127,7 +127,7 @@ class TestFindBinary(unittest.TestCase):
         with mock.patch("gui.client.shutil.which", return_value=None), mock.patch(
             "os.path.isfile", return_value=False
         ):
-            self.assertEqual(find_binary(), "keybackcon")
+            self.assertEqual(find_binary(), "ilutex")
 
 
 class TestRunErrores(unittest.TestCase):
@@ -228,7 +228,7 @@ class TestEstadoYPidfile(unittest.TestCase):
     def test_get_state_file_solo_legado(self):
         env = EntornoXdg()
         try:
-            legado = os.path.join(env.tmp, "state", "kbd-rgb")
+            legado = os.path.join(env.tmp, "state", "keybackcon")
             os.makedirs(legado, exist_ok=True)
             with open(os.path.join(legado, "state"), "w") as f:
                 f.write("ff0000 60\n")

@@ -1,7 +1,7 @@
 {
-  "name": "keybackcon",
-  "version": "2.3.0",
-  "description": "Keyboard Backlight Controls — control RGB del teclado AERO X16 vía HID LampArray, sin dependencias (binario precompilado + instalación automática de servicios)",
+  "name": "ilutex",
+  "version": "2.5.0",
+  "description": "iLutex — control cromático del teclado AERO X16 vía HID LampArray, sin dependencias (binario precompilado + instalación automática de servicios)",
   "license": "MIT",
   "type": "commonjs",
   "repository": "Soluciones-Alexendros/keybackcon",
@@ -12,6 +12,7 @@
     "hid",
     "lamparray",
     "backlight",
+    "lutex",
     "aero-x16"
   ],
   "os": [
@@ -21,23 +22,23 @@
     "node": ">=18"
   },
   "bin": {
-    "keybackcon": "bin/keybackcon.js"
+    "ilutex": "bin/ilutex.js"
   },
   "scripts": {
     "postinstall": "node install.js"
   },
   "optionalDependencies": {
-    "keybackcon-linux-x64": "2.3.0",
-    "keybackcon-linux-arm64": "2.3.0"
+    "ilutex-linux-x64": "2.5.0",
+    "ilutex-linux-arm64": "2.5.0"
   },
   "files": [
-    "bin/keybackcon.js",
+    "bin/ilutex.js",
     "install.js",
-    "udev/70-keybackcon.rules",
-    "tmpfiles.d/keybackcon.conf",
-    "sysusers.d/keybackcon.conf",
-    "systemd/keybackcon.service",
-    "systemd/keybackcon-animation@.service",
+    "udev/70-ilutex.rules",
+    "tmpfiles.d/ilutex.conf",
+    "sysusers.d/ilutex.conf",
+    "systemd/ilutex.service",
+    "systemd/ilutex-animation@.service",
     "README.md"
   ]
 }

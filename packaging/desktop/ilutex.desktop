@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=iLutex
+Name[es]=iLutex
+GenericName=Control de iluminación del teclado
+GenericName[es]=Control de iluminación del teclado
+Comment=Fija la luz de tu teclado AERO X16 en dos toques
+Comment[es]=Fija la luz de tu teclado AERO X16 en dos toques
+Exec=ilutex-gui
+Icon=ilutex
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=keyboard;backlight;rgb;teclado;luz;retroiluminacion;lutex;
+StartupWMClass=org.alexendros.ilutex

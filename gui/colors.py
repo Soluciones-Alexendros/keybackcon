@@ -30,6 +30,10 @@ COLORES = [
     (N_("Off"), "000000"),
 ]
 
+# Marcador del filtro «Seguir escritorio»: el color real se resuelve en vivo
+# desde el acento de Omarchy, no es un hex fijo.
+FOLLOW_DESKTOP = "follow-desktop"
+
 
 def hex_to_rgb(h):
     h = h.strip().lstrip("#")
