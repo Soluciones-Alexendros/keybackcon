@@ -23,6 +23,13 @@ hex_to_rgb = _colors.hex_to_rgb
 hsv_to_rgb = _colors.hsv_to_rgb
 COLORES = _colors.COLORES
 
+from gui.constants import (
+    BRILLO_PASO,
+    BRIGHTNESS_DEBOUNCE_MS,
+    STATE_POLL_SECONDS,
+    TRAY_TICK_SECONDS,
+)
+
 
 class TrayUnavailable(Exception):
     pass
@@ -49,7 +56,6 @@ except Exception as exc:
 
 
 MODES = ("fijar", "breathe", "rainbow", "off")
-BRILLO_PASO = 5
 
 
 def _normalize_hex(color_hex):
@@ -194,7 +200,7 @@ class TrayIndicator:
             except Exception:
                 continue
         try:
-            GLib.timeout_add_seconds(2, self._tick)
+            GLib.timeout_add_seconds(TRAY_TICK_SECONDS, self._tick)
         except Exception:
             log_exc("temporizador de bandeja")
 
@@ -489,7 +495,7 @@ class TrayIndicator:
                 GLib.source_remove(self._bright_source)
             except Exception:
                 log_exc("cancelar brillo pendiente")
-        self._bright_source = GLib.timeout_add(150, self._aplicar_brillo, pct)
+        self._bright_source = GLib.timeout_add(BRIGHTNESS_DEBOUNCE_MS, self._aplicar_brillo, pct)
 
     def _aplicar_brillo(self, pct):
         self._bright_source = None

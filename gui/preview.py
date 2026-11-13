@@ -23,16 +23,19 @@ hex_to_rgb = _colors.hex_to_rgb
 scale_rgb = _colors.scale_rgb
 hsv_to_rgb = _colors.hsv_to_rgb
 
-MODES = ("fijar", "breathe", "rainbow")
+from gui.constants import (
+    MAX_PARTICLES,
+    BREATHE_PERIOD,
+    FIX_PULSE_PERIOD,
+    RAINBOW_DEG_PER_SEC,
+    DT_MAX,
+    BREATHE_RATE_BASE,
+    BREATHE_RATE_SPAN,
+    RAINBOW_RATE,
+)
 
-_MAX_PARTICLES = 120
-_BREATHE_PERIOD = 4.0
-_FIX_PULSE_PERIOD = 3.0
-_RAINBOW_DEG_PER_SEC = 45.0
-_DT_MAX = 0.05
-_BREATHE_RATE_BASE = 8.0
-_BREATHE_RATE_SPAN = 30.0
-_RAINBOW_RATE = 42.0
+
+MODES = ("fijar", "breathe", "rainbow")
 
 
 def animations_enabled():
@@ -53,12 +56,12 @@ def mode_label(mode):
 
 def resolve_color(color_hex, pct, mode, t, animate):
     if mode == "rainbow" and animate:
-        r, g, b = hsv_to_rgb((t * 45.0) % 360.0, 1.0, 1.0)
+        r, g, b = hsv_to_rgb((t * RAINBOW_DEG_PER_SEC) % 360.0, 1.0, 1.0)
         k = pct / 100.0
         return r * k, g * k, b * k
     if mode == "breathe" and animate:
-        k = (1 - math.cos(t * 2 * math.pi / 4.0)) / 2.0
-        factor = (8.0 + k * 92.0) * (pct / 100.0) / 100.0
+        k = (1 - math.cos(t * 2 * math.pi / BREATHE_PERIOD)) / 2.0
+        factor = (BREATHE_RATE_BASE + k * BREATHE_RATE_SPAN) * (pct / 100.0) / 100.0
         br, bg, bb = hex_to_rgb(color_hex)
         return br * factor, bg * factor, bb * factor
     return scale_rgb(color_hex, pct)
@@ -125,16 +128,16 @@ class StagePreview:
         self._palive = 0
         self._spawn_acc = 0.0
         self._last_us = self.t0
-        self._px = [0.0] * _MAX_PARTICLES
-        self._py = [0.0] * _MAX_PARTICLES
-        self._pvx = [0.0] * _MAX_PARTICLES
-        self._pvy = [0.0] * _MAX_PARTICLES
-        self._page = [0.0] * _MAX_PARTICLES
-        self._plife = [1.0] * _MAX_PARTICLES
-        self._psize = [2.0] * _MAX_PARTICLES
-        self._pr = [1.0] * _MAX_PARTICLES
-        self._pg = [1.0] * _MAX_PARTICLES
-        self._pb = [1.0] * _MAX_PARTICLES
+        self._px = [0.0] * MAX_PARTICLES
+        self._py = [0.0] * MAX_PARTICLES
+        self._pvx = [0.0] * MAX_PARTICLES
+        self._pvy = [0.0] * MAX_PARTICLES
+        self._page = [0.0] * MAX_PARTICLES
+        self._plife = [1.0] * MAX_PARTICLES
+        self._psize = [2.0] * MAX_PARTICLES
+        self._pr = [1.0] * MAX_PARTICLES
+        self._pg = [1.0] * MAX_PARTICLES
+        self._pb = [1.0] * MAX_PARTICLES
 
     def set_color(self, color_hex):
         self.color_hex = color_hex
@@ -166,8 +169,8 @@ class StagePreview:
         dt = (now - self._last_us) / 1000000.0
         if dt < 0.0:
             dt = 0.0
-        elif dt > _DT_MAX:
-            dt = _DT_MAX
+        elif dt > DT_MAX:
+            dt = DT_MAX
         self._last_us = now
         try:
             ww = float(w)
@@ -224,7 +227,7 @@ class StagePreview:
             r, g, b = scale_rgb(self.color_hex, pct)
         except Exception:
             r, g, b = (1.0, 1.0, 1.0)
-        pulse = 0.5 + 0.5 * math.sin(t * 2.0 * math.pi / _FIX_PULSE_PERIOD)
+        pulse = 0.5 + 0.5 * math.sin(t * 2.0 * math.pi / FIX_PULSE_PERIOD)
         cx = w / 2.0
         cy = h / 2.0 - 8.0
         grow = 1.0 + 0.035 * (pulse - 0.5) * 2.0
@@ -305,7 +308,7 @@ class StagePreview:
         acc = self._spawn_acc + rate * dt
         n_new = int(acc)
         acc -= n_new
-        free = _MAX_PARTICLES - alive
+        free = MAX_PARTICLES - alive
         if n_new > free:
             n_new = free
             acc = 0.0
@@ -379,12 +382,12 @@ class StagePreview:
             dim = pct / 100.0
         cx = w / 2.0
         cy = h / 2.0 - 8.0
-        base_hue = (t * _RAINBOW_DEG_PER_SEC) % 360.0
+        base_hue = (t * RAINBOW_DEG_PER_SEC) % 360.0
         alive = self._palive
         acc = self._spawn_acc + rate * dt
         n_new = int(acc)
         acc -= n_new
-        free = _MAX_PARTICLES - alive
+        free = MAX_PARTICLES - alive
         if n_new > free:
             n_new = free
             acc = 0.0

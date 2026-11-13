@@ -53,10 +53,20 @@ except Exception:
     def N_(s):
         return s
 
+from gui.constants import (
+    BRILLO_PASO,
+    STAGE_HEIGHT,
+    DEFAULT_WINDOW_WIDTH,
+    DEFAULT_WINDOW_HEIGHT,
+    MIN_WINDOW_WIDTH,
+    MIN_WINDOW_HEIGHT,
+    BRIGHTNESS_DEBOUNCE_MS,
+    STATE_POLL_SECONDS,
+)
+
 
 APP_ID = "org.iniciativas.keybackcon"
 APP_TITLE = "Keyboard Backlight Controls"
-BRILLO_PASO = 5
 ESTADO_SIN_TECLADO = {}
 
 
@@ -160,8 +170,8 @@ class MesaWindow(Adw.ApplicationWindow):
         super().__init__(application=app)
         apply_saved_theme()
         self.set_title("keybackcon")
-        self.set_default_size(460, 840)
-        self.set_size_request(420, 620)
+        self.set_default_size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+        self.set_size_request(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         self._hide_on_close = hide_on_close
         self._on_preferences = on_preferences
         if client is None:
@@ -212,7 +222,7 @@ class MesaWindow(Adw.ApplicationWindow):
         toolbar.set_content(content)
         stage_frame = Gtk.Frame()
         stage_frame.add_css_class("preview-card")
-        stage_frame.set_size_request(-1, 150)
+        stage_frame.set_size_request(-1, STAGE_HEIGHT)
         content.append(stage_frame)
         self.stage = Gtk.DrawingArea()
         self.stage.set_hexpand(True)
@@ -489,7 +499,7 @@ class MesaWindow(Adw.ApplicationWindow):
         except Exception:
             log_exc("vigilante de estado")
         # Respaldo barato: archivos y pidfile, nunca subprocess.
-        GLib.timeout_add_seconds(2, self._poll_state)
+        GLib.timeout_add_seconds(STATE_POLL_SECONDS, self._poll_state)
 
     def _on_state_file_changed(self, _monitor, f, _other, _event):
         try:
@@ -652,7 +662,7 @@ class MesaWindow(Adw.ApplicationWindow):
                 GLib.source_remove(self._bright_source)
             except Exception:
                 log_exc("cancelar brillo pendiente")
-        self._bright_source = GLib.timeout_add(150, self._apply_bright, pct)
+        self._bright_source = GLib.timeout_add(BRIGHTNESS_DEBOUNCE_MS, self._apply_bright, pct)
 
     def _on_bright_step(self, _btn, delta):
         try:
