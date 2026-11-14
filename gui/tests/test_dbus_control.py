@@ -41,10 +41,10 @@ BUS_DISPONIBLE = GI_DISPONIBLE and DAEMON is not None
 
 # En CI se exige que estos tests corran de verdad: sin las dependencias, el
 # job falla en vez de saltarse la cobertura del control D-Bus.
-REQUERIDO = os.environ.get("KEYBACKCON_REQUIRE_DBUS") == "1"
+REQUERIDO = os.environ.get("ILUTEX_REQUIRE_DBUS") == "1"
 if REQUERIDO and not BUS_DISPONIBLE:
     raise RuntimeError(
-        "KEYBACKCON_REQUIRE_DBUS=1 pero falta python3-gi o dbus-daemon"
+        "ILUTEX_REQUIRE_DBUS=1 pero falta python3-gi o dbus-daemon"
     )
 
 _BUS = None

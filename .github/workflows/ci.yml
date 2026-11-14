@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           VER_TOML=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
-          VER_LOCK=$(awk '/name = "keybackcon"/{getline; print; exit}' Cargo.lock | sed -E 's/.*"([^"]+)".*/\1/')
+          VER_LOCK=$(awk '/name = "ilutex"/{getline; print; exit}' Cargo.lock | sed -E 's/.*"([^"]+)".*/\1/')
           test "$VER_TOML" = "$VER_LOCK"
       - name: GUI py_compile
         run: python3 -m py_compile gui/*.py
@@ -48,13 +48,13 @@ jobs:
           for po in po/*.po; do
             lang=$(basename "$po" .po)
             mkdir -p "gui/locale/$lang/LC_MESSAGES"
-            msgfmt -c -o "gui/locale/$lang/LC_MESSAGES/keybackcon.mo" "$po"
+            msgfmt -c -o "gui/locale/$lang/LC_MESSAGES/ilutex.mo" "$po"
           done
       - name: GUI tests
         env:
-          KEYBACKCON_REQUIRE_DBUS: "1"
-          KEYBACKCON_REQUIRE_GUI_SUITE: "1"
-          KEYBACKCON_GUI_TESTS: "1"
+          ILUTEX_REQUIRE_DBUS: "1"
+          ILUTEX_REQUIRE_GUI_SUITE: "1"
+          ILUTEX_GUI_TESTS: "1"
         run: |
           set -euo pipefail
           sudo apt-get update -qq
@@ -68,20 +68,20 @@ jobs:
           python3 -c "from gi.repository import Gio, GLib; print('GLib', GLib.MAJOR_VERSION, GLib.MINOR_VERSION)"
           python3 -c "import gi; gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1'); from gi.repository import Gtk, Adw; print('GTK', Gtk.get_major_version(), Gtk.get_minor_version(), 'Adw OK')"
           # Display virtual: sin xvfb Adw.Application no arranca y la suite
-          # KEYBACKCON_GUI_TESTS quedaría omitida o en rojo opaco.
+          # ILUTEX_GUI_TESTS quedaría omitida o en rojo opaco.
           GDK_BACKEND=x11 xvfb-run -a python3 -m unittest discover -s gui/tests -v
       - name: shellcheck
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck
-          shellcheck scripts/install.sh scripts/smoke.sh packaging/keybackcon-gui \
+          shellcheck scripts/install.sh scripts/smoke.sh packaging/ilutex-gui \
             packaging/debian/postinst packaging/debian/prerm packaging/aur/PKGBUILD
       - name: desktop-file-validate
         run: |
           set -euo pipefail
           sudo apt-get install -y -qq desktop-file-utils
-          desktop-file-validate packaging/desktop/keybackcon.desktop
+          desktop-file-validate packaging/desktop/ilutex.desktop
 
   test:
     name: test
@@ -113,8 +113,8 @@ jobs:
         run: git diff --exit-code
       - uses: actions/upload-artifact@v4
         with:
-          name: keybackcon-linux
-          path: target/release/keybackcon
+          name: ilutex-linux
+          path: target/release/ilutex
           if-no-files-found: error
 
   smoke:
@@ -126,9 +126,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: keybackcon-linux
+          name: ilutex-linux
           path: target/release
-      - run: chmod +x target/release/keybackcon
+      - run: chmod +x target/release/ilutex
       - run: bash scripts/smoke.sh
       - name: Ayuda sale 0
-        run: target/release/keybackcon --help >/dev/null
+        run: target/release/ilutex --help >/dev/null

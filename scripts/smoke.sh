@@ -79,7 +79,7 @@ else
   bad "systemd anim"
 fi
 
-if grep -q '__KEYBACKCON_BIN__' "${REPO_DIR}/scripts/install.sh"; then
+if grep -q '__ILUTEX_BIN__' "${REPO_DIR}/scripts/install.sh"; then
   ok "install.sh reescribe unidades a ~/.local/bin"
 else
   bad "install.sh reescritura de unidades"

@@ -104,11 +104,11 @@ echo "==> ilutex: instalar unidades systemd de usuario"
 mkdir -p "${UNIT_DST}"
 for unit in "${REPO_DIR}/packaging/systemd"/*.service; do
   [ -f "$unit" ] || continue
-  sed "s|__KEYBACKCON_BIN__|${BIN_DST}/ilutex|g" "$unit" > "${UNIT_DST}/$(basename "$unit")"
+  sed "s|__ILUTEX_BIN__|${BIN_DST}/ilutex|g" "$unit" > "${UNIT_DST}/$(basename "$unit")"
 done
 systemctl --user daemon-reload 2>/dev/null || true
 
-# Restauración al login: solo si la unidad es nueva o se fuerza (KEYBACKCON_ENABLE_RESTORE=1).
+# Restauración al login: solo si la unidad es nueva o se fuerza (ILUTEX_ENABLE_RESTORE=1).
 prev_enable="$(systemctl --user is-enabled ilutex.service 2>/dev/null || true)"
 had_unit=false
 [ -f "${UNIT_DST}/ilutex.service" ] && had_unit=true
@@ -117,7 +117,7 @@ if [ "$prev_enable" = "disabled" ] || [ "$prev_enable" = "masked" ]; then
 elif [ "$prev_enable" = "enabled" ] || [ "$prev_enable" = "enabled-runtime" ]; then
   : # ya activa
 else
-  force_enable="${KEYBACKCON_ENABLE_RESTORE:-0}"
+  force_enable="${ILUTEX_ENABLE_RESTORE:-0}"
   if [ "$had_unit" = false ] || [ "$force_enable" = 1 ]; then
     systemctl --user enable ilutex.service
     echo "==> ilutex: restauración al login habilitada (systemctl --user enable ilutex.service)"
@@ -125,8 +125,8 @@ else
 fi
 
 echo "==> ilutex: regla udev (opcional, root)"
-if [ "${KEYBACKCON_SKIP_UDEV:-0}" = "1" ]; then
-  echo "    omitida (KEYBACKCON_SKIP_UDEV=1)"
+if [ "${ILUTEX_SKIP_UDEV:-0}" = "1" ]; then
+  echo "    omitida (ILUTEX_SKIP_UDEV=1)"
 else
   udev_ok=1
   if ! sudo install -D -m644 "${REPO_DIR}/packaging/udev/70-ilutex.rules" /etc/udev/rules.d/70-ilutex.rules; then

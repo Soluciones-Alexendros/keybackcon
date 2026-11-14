@@ -1,6 +1,6 @@
 ---
 name: Feature
-description: Propuesta de mejora para keybackcon
+description: Propuesta de mejora para iLutex
 ---
 
 ## Problema

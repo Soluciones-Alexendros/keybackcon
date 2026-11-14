@@ -39,19 +39,19 @@ class FakeClient:
         return None
 
 
-# El job quality exige la suite gráfica con KEYBACKCON_REQUIRE_GUI_SUITE=1.
+# El job quality exige la suite gráfica con ILUTEX_REQUIRE_GUI_SUITE=1.
 # Smoke y otros entornos con CI=true no la fuerzan (sin GTK/xvfb).
-_GUI_SUITE = os.environ.get("KEYBACKCON_GUI_TESTS") == "1"
-if os.environ.get("KEYBACKCON_REQUIRE_GUI_SUITE") == "1" and not _GUI_SUITE:
+_GUI_SUITE = os.environ.get("ILUTEX_GUI_TESTS") == "1"
+if os.environ.get("ILUTEX_REQUIRE_GUI_SUITE") == "1" and not _GUI_SUITE:
     raise RuntimeError(
-        "suite gráfica obligatoria: define KEYBACKCON_GUI_TESTS=1 "
-        "(junto a KEYBACKCON_REQUIRE_GUI_SUITE=1)"
+        "suite gráfica obligatoria: define ILUTEX_GUI_TESTS=1 "
+        "(junto a ILUTEX_REQUIRE_GUI_SUITE=1)"
     )
 
 
 @unittest.skipUnless(
     _GUI_SUITE,
-    "requiere GTK/Adw en display (KEYBACKCON_GUI_TESTS=1)",
+    "requiere GTK/Adw en display (ILUTEX_GUI_TESTS=1)",
 )
 class TestWindowInitSinEscrituras(unittest.TestCase):
     def test_construir_no_llama_al_cli_de_escritura(self):
@@ -65,7 +65,7 @@ class TestWindowInitSinEscrituras(unittest.TestCase):
 
         ok, msg = check_gui_requirements()
         if not ok:
-            self.fail(f"KEYBACKCON_GUI_TESTS=1 pero GUI no usable: {msg}")
+            self.fail(f"ILUTEX_GUI_TESTS=1 pero GUI no usable: {msg}")
 
         from gui.window import MesaWindow
 

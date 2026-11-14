@@ -74,7 +74,7 @@ jobs:
           echo "bump: $OLD -> $NEW"
           sed -i "s/^version = \"$OLD\"/version = \"$NEW\"/" Cargo.toml
           # Mantener Cargo.lock alineado con Cargo.toml (H-01 / H-35).
-          cargo update -p keybackcon
+          cargo update -p ilutex
           sed -i "s/^__version__ = \".*\"/__version__ = \"$NEW\"/" gui/__init__.py
           sed -i "s/^pkgver=.*/pkgver=$NEW/" packaging/aur/PKGBUILD
           if [ -f npm/package.json ]; then

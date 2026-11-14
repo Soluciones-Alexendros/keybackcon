@@ -41,10 +41,10 @@ jobs:
         run: python3 -m py_compile gui/*.py
       - name: Suite Python (alineada con quality de CI)
         env:
-          KEYBACKCON_REQUIRE_DBUS: "1"
+          ILUTEX_REQUIRE_DBUS: "1"
           # Misma señal que quality (KBC-31): no deshacer al rebasear sobre #43.
-          KEYBACKCON_REQUIRE_GUI_SUITE: "1"
-          KEYBACKCON_GUI_TESTS: "1"
+          ILUTEX_REQUIRE_GUI_SUITE: "1"
+          ILUTEX_GUI_TESTS: "1"
         run: |
           set -euo pipefail
           sudo apt-get update -qq
