@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: ilutex 3.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/Soluciones-Alexendros/ilutex/"
 "issues\n"
-"POT-Creation-Date: 2026-11-14 01:05+0100\n"
+"POT-Creation-Date: 2026-11-14 02:23+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -90,19 +90,19 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
-#: gui/preview.py:69 gui/tray.py:294 gui/window.py:312 gui/window.py:531
+#: gui/preview.py:69 gui/tray.py:294 gui/window.py:310 gui/window.py:521
 msgid "Breathe"
 msgstr ""
 
-#: gui/preview.py:71 gui/tray.py:295 gui/window.py:312 gui/window.py:532
+#: gui/preview.py:71 gui/tray.py:295 gui/window.py:310 gui/window.py:522
 msgid "Rainbow"
 msgstr ""
 
-#: gui/preview.py:72 gui/tray.py:293 gui/window.py:312 gui/window.py:530
+#: gui/preview.py:72 gui/tray.py:293 gui/window.py:310 gui/window.py:520
 msgid "Steady"
 msgstr ""
 
-#: gui/settings.py:181 gui/tray.py:229 gui/window.py:259 gui/window.py:512
+#: gui/settings.py:181 gui/tray.py:229 gui/window.py:258 gui/window.py:502
 msgid "Preferences"
 msgstr ""
 
@@ -182,15 +182,15 @@ msgstr ""
 msgid "Device"
 msgstr ""
 
-#: gui/settings.py:342 gui/settings.py:346 gui/window.py:780
+#: gui/settings.py:342 gui/settings.py:346 gui/window.py:770
 msgid "no keyboard in sight"
 msgstr ""
 
-#: gui/settings.py:343 gui/window.py:245 gui/window.py:777
+#: gui/settings.py:343 gui/window.py:245 gui/window.py:767
 msgid "looking at the keyboard…"
 msgstr ""
 
-#: gui/settings.py:356 gui/window.py:774
+#: gui/settings.py:356 gui/window.py:764
 msgid "zone(s)"
 msgstr ""
 
@@ -218,7 +218,7 @@ msgstr ""
 msgid "Quit"
 msgstr ""
 
-#: gui/tray.py:262 gui/window.py:360 gui/window.py:563
+#: gui/tray.py:262 gui/window.py:350 gui/window.py:553
 msgid "Brightness"
 msgstr ""
 
@@ -226,157 +226,157 @@ msgstr ""
 msgid "Your shade…"
 msgstr ""
 
-#: gui/window.py:303 gui/window.py:513
+#: gui/window.py:302 gui/window.py:503
 msgid "How it moves"
 msgstr ""
 
-#: gui/window.py:304 gui/window.py:515
+#: gui/window.py:303 gui/window.py:505
 msgid "Hold the light steady or let it breathe."
 msgstr ""
 
-#: gui/window.py:333 gui/window.py:526
+#: gui/window.py:323 gui/window.py:516
 msgid "Stop motion"
 msgstr ""
 
-#: gui/window.py:340 gui/window.py:517
+#: gui/window.py:330 gui/window.py:507
 msgid "How much light you want"
 msgstr ""
 
-#: gui/window.py:341 gui/window.py:519
+#: gui/window.py:331 gui/window.py:509
 msgid "Slide or use − / + . It saves itself."
 msgstr ""
 
-#: gui/window.py:374 gui/window.py:527
+#: gui/window.py:364 gui/window.py:517
 msgid "Lower brightness"
 msgstr ""
 
-#: gui/window.py:376 gui/window.py:528
+#: gui/window.py:366 gui/window.py:518
 msgid "Raise brightness"
 msgstr ""
 
-#: gui/window.py:388 gui/window.py:521
+#: gui/window.py:378 gui/window.py:511
 msgid "Choose your light"
 msgstr ""
 
-#: gui/window.py:389 gui/window.py:523
+#: gui/window.py:379 gui/window.py:513
 msgid "Tap a filter or create your own shade."
 msgstr ""
 
-#: gui/window.py:418 gui/window.py:549
+#: gui/window.py:408 gui/window.py:539
 msgid "Follow desktop"
 msgstr ""
 
-#: gui/window.py:448 gui/window.py:525
+#: gui/window.py:438 gui/window.py:515
 msgid "Custom shade"
 msgstr ""
 
-#: gui/window.py:588
+#: gui/window.py:578
 msgid "Something went wrong"
 msgstr ""
 
-#: gui/window.py:589 gui/window.py:1153
+#: gui/window.py:579 gui/window.py:1143
 msgid "Got it"
 msgstr ""
 
-#: gui/window.py:635
+#: gui/window.py:625
 msgid "Could not set the color"
 msgstr ""
 
-#: gui/window.py:645
+#: gui/window.py:635
 msgid "Could not adjust the brightness"
 msgstr ""
 
-#: gui/window.py:652
+#: gui/window.py:642
 msgid "Could not stop"
 msgstr ""
 
-#: gui/window.py:663
+#: gui/window.py:653
 msgid "Could not start the animation"
 msgstr ""
 
-#: gui/window.py:665
+#: gui/window.py:655
 #, python-brace-format
 msgid "{mode} motion running"
 msgstr ""
 
-#: gui/window.py:764
+#: gui/window.py:754
 #, python-brace-format
 msgid "moving (pid {pid})"
 msgstr ""
 
-#: gui/window.py:769
+#: gui/window.py:759
 msgid "steady light"
 msgstr ""
 
-#: gui/window.py:814 gui/window.py:1033
+#: gui/window.py:804 gui/window.py:1023
 msgid "Your shade"
 msgstr ""
 
-#: gui/window.py:837 gui/window.py:855
+#: gui/window.py:827 gui/window.py:845
 #, python-brace-format
 msgid "{nombre} applied"
 msgstr ""
 
-#: gui/window.py:872
+#: gui/window.py:862
 #, python-brace-format
 msgid "Your shade #{hexv} applied"
 msgstr ""
 
-#: gui/window.py:945
+#: gui/window.py:935
 msgid "Light steady again"
 msgstr ""
 
-#: gui/window.py:1014
+#: gui/window.py:1004
 msgid "Leave iLutex?"
 msgstr ""
 
-#: gui/window.py:1015
+#: gui/window.py:1005
 msgid "There is a change still on its way to the keyboard."
 msgstr ""
 
-#: gui/window.py:1017
+#: gui/window.py:1007
 msgid "Stay"
 msgstr ""
 
-#: gui/window.py:1018 gui/window.py:1041
+#: gui/window.py:1008 gui/window.py:1031
 msgid "Leave"
 msgstr ""
 
-#: gui/window.py:1040
+#: gui/window.py:1030
 msgid "Stay here"
 msgstr ""
 
-#: gui/window.py:1042
+#: gui/window.py:1032
 msgid "Apply steady light"
 msgstr ""
 
-#: gui/window.py:1043
+#: gui/window.py:1033
 msgid "Pick a filter"
 msgstr ""
 
-#: gui/window.py:1044
+#: gui/window.py:1034
 msgid "Brush the light up or down"
 msgstr ""
 
-#: gui/window.py:1045
+#: gui/window.py:1035
 msgid "Navigate the filters"
 msgstr ""
 
-#: gui/window.py:1045
+#: gui/window.py:1035
 msgid "Arrow keys"
 msgstr ""
 
-#: gui/window.py:1052 gui/window.py:1068
+#: gui/window.py:1042 gui/window.py:1058
 msgid "Keyboard shortcuts"
 msgstr ""
 
-#: gui/window.py:1141
+#: gui/window.py:1131
 msgid ""
 "Could not talk to the keyboard. It is usually a system permission and one "
 "click fixes it."
 msgstr ""
 
-#: gui/window.py:1143
+#: gui/window.py:1133
 msgid ""
 "Could not talk to the keyboard. Install it by hand and retry: install -m644 "
 "~/.local/share/ilutex/70-ilutex.rules /etc/udev/rules.d/70-ilutex.rules && "
@@ -384,18 +384,18 @@ msgid ""
 "match=hidraw"
 msgstr ""
 
-#: gui/window.py:1145
+#: gui/window.py:1135
 msgid "No keyboard access"
 msgstr ""
 
-#: gui/window.py:1151
+#: gui/window.py:1141
 msgid "Install permission"
 msgstr ""
 
-#: gui/window.py:1152
+#: gui/window.py:1142
 msgid "Retry"
 msgstr ""
 
-#: gui/window.py:1188
+#: gui/window.py:1183
 msgid "Permission not installed (pkexec cancelled or not authorized)."
 msgstr ""

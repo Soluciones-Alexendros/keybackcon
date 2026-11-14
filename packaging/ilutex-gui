@@ -1,11 +1,45 @@
 #!/usr/bin/env bash
-# Lanzador de la mesa de luz iLutex: localiza el paquete gui/ y lo ejecuta.
+# Lanzador de la mesa de luz iLutex: localiza el paquete gui/ y lo ejecuta con
+# un Python que pueda importar GTK.
+#
+# `python3` en el PATH no siempre es el del sistema: con mise, pyenv o conda
+# delante, el intérprete no ve los tipos de PyGObject que instala pacman, y la
+# ventana se negaría a arrancar aunque GTK esté instalado. Se prueba en orden y
+# se queda el primero que pueda cargar GTK 4 y Adw.
 set -u
+
 here="$(cd "$(dirname "$0")" && pwd)"
+gui_dir=""
 for d in "${ILUTEX_GUI_DIR:-}" "$here/gui" "${HOME}/.local/share/ilutex/gui" /usr/share/ilutex/gui; do
   if [ -n "$d" ] && [ -f "$d/main.py" ]; then
-    exec python3 "$d/main.py" "$@"
+    gui_dir="$d"
+    break
   fi
 done
-echo "ilutex-gui: no se encontró el paquete gui (¿ejecutaste ./scripts/install.sh?)" >&2
-exit 1
+
+if [ -z "$gui_dir" ]; then
+  echo "ilutex-gui: no se encontró el paquete gui (¿ejecutaste ./scripts/install.sh?)" >&2
+  exit 1
+fi
+
+has_gtk() {
+  "$1" -c 'import gi; gi.require_version("Gtk", "4.0"); gi.require_version("Adw", "1"); from gi.repository import Gtk, Adw' \
+    >/dev/null 2>&1
+}
+
+python_bin=""
+for candidate in "${ILUTEX_PYTHON:-}" python3 /usr/bin/python3 python; do
+  [ -n "$candidate" ] || continue
+  if command -v "$candidate" >/dev/null 2>&1 && has_gtk "$candidate"; then
+    python_bin="$candidate"
+    break
+  fi
+done
+
+if [ -z "$python_bin" ]; then
+  echo "ilutex-gui: hace falta GTK4/libadwaita (python3-gi)." >&2
+  echo "  instala: sudo pacman -S python-gobject gtk4 libadwaita" >&2
+  exit 1
+fi
+
+exec "$python_bin" "$gui_dir/main.py" "$@"
