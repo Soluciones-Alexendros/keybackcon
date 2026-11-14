@@ -1106,7 +1106,7 @@ class MesaWindow(Adw.ApplicationWindow):
 
     def _udev_source(self):
         try:
-            return os.path.expanduser("~/.local/share/keybackcon/70-keybackcon.rules")
+            return os.path.expanduser("~/.local/share/ilutex/70-ilutex.rules")
         except Exception:
             log_exc("ruta udev")
             return ""
@@ -1127,7 +1127,7 @@ class MesaWindow(Adw.ApplicationWindow):
     def _maybe_udev_dialog(self):
         """Se decide con el info ya traído por hilo: aquí no hay subprocess."""
         try:
-            if os.path.exists("/etc/udev/rules.d/70-keybackcon.rules"):
+            if os.path.exists("/etc/udev/rules.d/70-ilutex.rules"):
                 return False
         except Exception:
             log_exc("regla udev del sistema")
@@ -1140,7 +1140,7 @@ class MesaWindow(Adw.ApplicationWindow):
         if can:
             body = _("Could not talk to the keyboard. It is usually a system permission and one click fixes it.")
         else:
-            body = _("Could not talk to the keyboard. Install it by hand and retry: install -m644 ~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=hidraw")
+            body = _("Could not talk to the keyboard. Install it by hand and retry: install -m644 ~/.local/share/ilutex/70-ilutex.rules /etc/udev/rules.d/70-ilutex.rules && sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=hidraw")
         try:
             dlg = Adw.AlertDialog.new(_("No keyboard access"), body)
         except Exception:
@@ -1178,7 +1178,7 @@ class MesaWindow(Adw.ApplicationWindow):
     def _instalar_udev(self):
         error = None
         src = self._udev_source()
-        dst = "/etc/udev/rules.d/70-keybackcon.rules"
+        dst = "/etc/udev/rules.d/70-ilutex.rules"
         cmd = udev_install_argv(src, dst)
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)

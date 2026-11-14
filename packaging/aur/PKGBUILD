@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2034,SC2154
 pkgname=ilutex
-pkgver=2.5.0
+pkgver=3.0.0
 pkgrel=1
 pkgdesc="iLutex — control cromático del teclado AERO X16 vía HID LampArray"
 arch=('x86_64')

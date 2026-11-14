@@ -33,7 +33,7 @@ class BinarioFake:
     def __init__(self, contenido="#!/bin/sh\nexit 0\n"):
         os.makedirs(self.BASE_EJECUTABLE, exist_ok=True)
         self.dir = tempfile.mkdtemp(prefix="kbc-test-bin-", dir=self.BASE_EJECUTABLE)
-        self.ruta = os.path.join(self.dir, "keybackcon")
+        self.ruta = os.path.join(self.dir, "ilutex")
         with open(self.ruta, "w") as f:
             f.write(contenido)
         os.chmod(self.ruta, os.stat(self.ruta).st_mode | stat.S_IEXEC)
@@ -132,7 +132,7 @@ class TestFindBinary(unittest.TestCase):
 
 class TestRunErrores(unittest.TestCase):
     def test_binario_inexistente(self):
-        cliente = KeybackconClient(binary="/no/existe/keybackcon")
+        cliente = KeybackconClient(binary="/no/existe/ilutex")
         with self.assertRaises(KeybackconError) as ctx:
             cliente.info()
         self.assertIn("Cannot find the binary", ctx.exception.message)
@@ -157,7 +157,7 @@ class TestRunErrores(unittest.TestCase):
         cliente = KeybackconClient(binary="/usr/bin/true")
 
         def timeout_run(*_a, **_k):
-            raise subprocess.TimeoutExpired(cmd="keybackcon", timeout=10)
+            raise subprocess.TimeoutExpired(cmd="ilutex", timeout=10)
 
         with mock.patch("gui.client.subprocess.run", side_effect=timeout_run):
             with self.assertRaises(KeybackconError) as ctx:
@@ -190,7 +190,7 @@ class TestEstadoYPidfile(unittest.TestCase):
     def test_get_state_file_parsing_y_clamp(self):
         env = EntornoXdg()
         try:
-            dir_state = os.path.join(env.tmp, "state", "keybackcon")
+            dir_state = os.path.join(env.tmp, "state", "ilutex")
             os.makedirs(dir_state, exist_ok=True)
             with open(os.path.join(dir_state, "state"), "w") as f:
                 f.write("FF7800 140\n")
@@ -206,7 +206,7 @@ class TestEstadoYPidfile(unittest.TestCase):
         env = EntornoXdg()
         try:
             base = env.tmp
-            nuevo = os.path.join(base, "state", "keybackcon")
+            nuevo = os.path.join(base, "state", "ilutex")
             legado = os.path.join(base, "state", "kbd-rgb")
             os.makedirs(nuevo, exist_ok=True)
             os.makedirs(legado, exist_ok=True)
@@ -265,9 +265,9 @@ class TestEstadoYPidfile(unittest.TestCase):
     def test_animation_running_detecta_proceso_propio(self):
         env = EntornoXdg()
         try:
-            pidfile = os.path.join(env.tmp, "run", "keybackcon", "animation.pid")
+            pidfile = os.path.join(env.tmp, "run", "ilutex", "animation.pid")
             os.makedirs(os.path.dirname(pidfile), exist_ok=True)
-            # Wrapper cuyo cmdline contiene 'keybackcon' tras el exec.
+            # Wrapper cuyo cmdline contiene 'ilutex' tras el exec.
             # Script con argv0 implícito en el nombre del fichero.
             fake = BinarioFake("#!/bin/sh\nexec sleep 30\n")
             wrapper = subprocess.Popen([fake.ruta], start_new_session=True)

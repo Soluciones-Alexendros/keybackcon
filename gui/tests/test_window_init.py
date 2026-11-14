@@ -69,7 +69,7 @@ class TestWindowInitSinEscrituras(unittest.TestCase):
 
         from gui.window import MesaWindow
 
-        app = Adw.Application(application_id="org.iniciativas.keybackcon.test")
+        app = Adw.Application(application_id="org.alexendros.ilutex.test")
         client = FakeClient()
 
         def _activate(a):

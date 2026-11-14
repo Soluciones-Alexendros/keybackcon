@@ -8,7 +8,7 @@ from gui import i18n
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOCALE_DIR = os.path.join(ROOT, "gui", "locale")
-POT = os.path.join(ROOT, "po", "keybackcon.pot")
+POT = os.path.join(ROOT, "po", "ilutex.pot")
 
 def _catalogo(lang):
     """Traducción compilada del repo; salta si falta el `.mo` (`make i18n`)."""

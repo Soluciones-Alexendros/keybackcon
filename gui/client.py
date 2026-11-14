@@ -348,7 +348,7 @@ class KeybackconClient:
                     continue
                 with open(f"/proc/{pid}/cmdline", "rb") as cf:
                     cmd = cf.read().decode(errors="ignore")
-                if "keybackcon" in cmd or "kbd-rgb" in cmd:
+                if "ilutex" in cmd or "keybackcon" in cmd or "kbd-rgb" in cmd:
                     return pid
                 os.unlink(path)
             except Exception:

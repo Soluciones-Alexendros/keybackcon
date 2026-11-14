@@ -120,7 +120,7 @@ def draw_stage(area, ctx, w, h, *, color_hex, pct, mode, t0):
 
 
 def tick_stage(area):
-    preview = getattr(area, "_keybackcon_preview", None)
+    preview = getattr(area, "_ilutex_preview", None)
     if preview is not None:
         try:
             if not preview._effects_enabled or not animations_enabled():
@@ -224,7 +224,7 @@ class StagePreview:
 
     def attach(self, area, interval=33):
         self._last_us = GLib.get_monotonic_time()
-        area._keybackcon_preview = self
+        area._ilutex_preview = self
         area.set_draw_func(self.draw, None)
         # Con movimiento reducido o escena fija, intervalo más largo (UX-19).
         try:

@@ -29,10 +29,10 @@ check-version: ## Verifica paridad Cargo npm tag CHANGELOG
 
 validate: lint test smoke check-version ## Fachada local = quality + test + smoke + version
 
-i18n: ## Regenera po/keybackcon.pot y compila los .mo en gui/locale
-	xgettext $(XGETTEXT_FLAGS) --output=po/keybackcon.pot gui/*.py
-	msgmerge --quiet --update --backup=none po/es.po po/keybackcon.pot
-	msgmerge --quiet --update --backup=none po/en.po po/keybackcon.pot
+i18n: ## Regenera po/ilutex.pot y compila los .mo en gui/locale
+	xgettext $(XGETTEXT_FLAGS) --output=po/ilutex.pot gui/*.py
+	msgmerge --quiet --update --backup=none po/es.po po/ilutex.pot
+	msgmerge --quiet --update --backup=none po/en.po po/ilutex.pot
 	@for po in $(PO_FILES); do \
 	  lang=$$(basename "$$po" .po); \
 	  dst="gui/locale/$$lang/LC_MESSAGES/ilutex.mo"; \

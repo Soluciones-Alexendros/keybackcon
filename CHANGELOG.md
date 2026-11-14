@@ -4,6 +4,33 @@ La fuente de verdad son los tags y `git-cliff`. Resumen:
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-11-14
+- **Cambio de nombre: el producto pasa a llamarse iLutex.** El binario, el
+  paquete, el app-id y las rutas cambian con él: `ilutex`, `ilutex-gui`,
+  `org.alexendros.ilutex` (D-Bus y GSettings), grupo `ilutex`, candado
+  `/run/ilutex/writer.lock`, estado en `~/.local/state/ilutex/state` y
+  pidfile en `$XDG_RUNTIME_DIR/ilutex/animation.pid`. El estado de `kbd-rgb`
+  y de `keybackcon` se sigue leyendo; `ilutex` sustituye a `keybackcon` al
+  instalarse.
+- Omarchy: el acento sale de `~/.local/state/omarchy/current/theme/colors.toml`
+  y se vigila en vivo, así que cambiar de tema repinta la ventana sin
+  reiniciar; nuevo filtro «Seguir escritorio» que aplica ese acento al
+  teclado.
+- Omarchy: el idioma se resuelve desde `~/.config/omarchy/language` (con el
+  locale como respaldo), se vigila y re-traduce la ventana en vivo.
+- Teclado: `?` abre la tabla de atajos, `Q` sale preguntando si hay un cambio
+  pendiente y Enter/Espacio aplican luz continua.
+- Accesibilidad: el estado es una live region, el movimiento forma un grupo
+  radio, el brillo anuncia su valor al moverse, los filtros se recorren con
+  las flechas y las pistas suben a contraste AA. Matriz en
+  `docs/runbooks/accesibilidad.md`.
+- Versionado: `scripts/check-version.sh` compara Cargo, npm, tag y CHANGELOG,
+  y el release aborta si divergen; las dependencias opcionales de npm pasan a
+  viajar en la misma versión que el paquete.
+- Empaquetado: receta de `omacom/omarchy-pkgs` en `packaging/omarchy-pkgs/`,
+  con tests de layout, udev, modos del candado, unidades y `.desktop`.
+- GUI: constantes compartidas en `gui/constants.py`.
+
 ## [2.5.0] — 2026-10-18
 - GUI i18n real: msgids en inglés (idioma fuente) y catálogos completos
   `es.po`/`en.po`; los nombres de color se traducen en el punto de uso (`N_`)

@@ -117,7 +117,7 @@ def _stop_client(client):
 
 def _aviso_falta(que, exc, rol):
     """Mensaje claro (sin traceback) con el comando de instalación de la distro."""
-    print(f"keybackcon-gui: hace falta {que}.", file=sys.stderr)
+    print(f"ilutex-gui: hace falta {que}.", file=sys.stderr)
     try:
         sugerencia = load("compat").sugerencia_instalacion(rol)
         print(f"  instala: {sugerencia}", file=sys.stderr)
@@ -214,7 +214,7 @@ def _run_window(open_preferences=False, hide_on_close=False):
     if check_gui_requirements is not None:
         ok, msg = check_gui_requirements()
         if not ok:
-            print(f"keybackcon-gui: {msg}", file=sys.stderr)
+            print(f"ilutex-gui: {msg}", file=sys.stderr)
             try:
                 sugerencia = load("compat").sugerencia_instalacion("gui")
                 print(f"  instala: {sugerencia}", file=sys.stderr)
@@ -309,7 +309,7 @@ def _run_tray_only(client, TrayIndicator):
         from gi.repository import Gtk, GLib
     except Exception as exc:
         _aviso_falta("GTK3 para la bandeja", exc, "bandeja")
-        print("keybackcon-gui: abriendo la ventana en su lugar.",
+        print("ilutex-gui: abriendo la ventana en su lugar.",
               file=sys.stderr)
         return _run_window()
 
@@ -366,7 +366,7 @@ def _run_tray_only(client, TrayIndicator):
             dialog = Gtk.MessageDialog(
                 message_type=Gtk.MessageType.INFO,
                 buttons=Gtk.ButtonsType.CLOSE,
-                text="keybackcon %s" % _app_version(),
+                text="iLutex %s" % _app_version(),
             )
             dialog.format_secondary_text("Keyboard Backlight Controls")
             dialog.run()

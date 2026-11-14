@@ -2,7 +2,7 @@
 """Verifica la coherencia de los catálogos gettext (sin dependencias).
 
 Comprueba que cada `po/*.po` cubra exactamente los msgid de
-`po/keybackcon.pot`, que ninguno quede sin traducir ni marcado `fuzzy`, que no
+`po/ilutex.pot`, que ninguno quede sin traducir ni marcado `fuzzy`, que no
 haya msgid duplicados y que el idioma esté declarado en `gui/i18n.py`.
 
 Uso: `python3 scripts/check-i18n.py [--extract]`
@@ -19,7 +19,7 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-POT = os.path.join(ROOT, "po", "keybackcon.pot")
+POT = os.path.join(ROOT, "po", "ilutex.pot")
 PO_DIR = os.path.join(ROOT, "po")
 I18N_PY = os.path.join(ROOT, "gui", "i18n.py")
 
@@ -121,7 +121,7 @@ def main(argv):
 
     if "--extract" in argv:
         with tempfile.TemporaryDirectory() as tmp:
-            fresh = os.path.join(tmp, "keybackcon.pot")
+            fresh = os.path.join(tmp, "ilutex.pot")
             if not extract_pot(fresh):
                 return 1
             fresh_ids = [mid for mid, _m, _f in parse(fresh)]
@@ -129,7 +129,7 @@ def main(argv):
         sobran = sorted(set(pot_ids) - set(fresh_ids))
         if faltan or sobran:
             fallos.append(
-                "po/keybackcon.pot no está sincronizado con el código "
+                "po/ilutex.pot no está sincronizado con el código "
                 f"(faltan {len(faltan)}: {faltan[:3]}; "
                 f"sobran {len(sobran)}: {sobran[:3]}); ejecuta `make i18n`"
             )

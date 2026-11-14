@@ -1,17 +1,17 @@
-//! `keybackcon` — Keyboard Backlight Controls: controla el RGB de la zona
+//! `ilutex` — Keyboard Backlight Controls: controla el RGB de la zona
 //! única del teclado AERO X16 hablando directamente con `/dev/hidrawN`
 //! mediante `ioctl` (`HIDIOCGFEATURE`/`HIDIOCSFEATURE`) y el protocolo USB HID
 //! `LampArray` (`Usage Page 0x59`), sin dependencias externas.
 //!
 //! # Modelo de hardware
 //!
-//! El firmware expone un descriptor `LampArray` estándar y `keybackcon` solo
+//! El firmware expone un descriptor `LampArray` estándar y `ilutex` solo
 //! usa los informes 1 (atributos), 5 (color de la zona `0..=LampCount-1`) y 6
 //! (efectos autónomos on/off). El dispositivo declara `IntensityLevelCount=1`
 //! (sin canal de brillo separable), así que `brightness` escala el color base
-//! y lo persiste en `$XDG_STATE_HOME/keybackcon/state`. Una animación en
+//! y lo persiste en `$XDG_STATE_HOME/ilutex/state`. Una animación en
 //! primer plano es una escritora de color. Toda escritura HID comparte el
-//! `flock` de `/run/keybackcon/writer.lock`; el pidfile solo anota la animación.
+//! `flock` de `/run/ilutex/writer.lock`; el pidfile solo anota la animación.
 //!
 //! # Mapa de módulos
 //!

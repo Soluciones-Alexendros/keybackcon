@@ -6,10 +6,10 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: ilutex 2.5.0\n"
+"Project-Id-Version: ilutex 3.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/Soluciones-Alexendros/keybackcon/"
 "issues\n"
-"POT-Creation-Date: 2026-11-13 23:01+0100\n"
+"POT-Creation-Date: 2026-11-14 01:05+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -379,9 +379,9 @@ msgstr ""
 #: gui/window.py:1143
 msgid ""
 "Could not talk to the keyboard. Install it by hand and retry: install -m644 "
-"~/.local/share/keybackcon/70-keybackcon.rules /etc/udev/rules.d/70-"
-"keybackcon.rules && sudo udevadm control --reload && sudo udevadm trigger --"
-"subsystem-match=hidraw"
+"~/.local/share/ilutex/70-ilutex.rules /etc/udev/rules.d/70-ilutex.rules && "
+"sudo udevadm control --reload && sudo udevadm trigger --subsystem-"
+"match=hidraw"
 msgstr ""
 
 #: gui/window.py:1145

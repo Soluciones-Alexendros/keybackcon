@@ -39,7 +39,7 @@ fn bench<T>(name: &str, iters: u32, mut f: impl FnMut() -> T) {
 }
 
 fn main() {
-    println!("keybackcon — operaciones puras (std, release)");
+    println!("iLutex — operaciones puras (std, release)");
 
     let mut t = 0u32;
     bench("parse_color", ITERS, || {

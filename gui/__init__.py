@@ -16,7 +16,7 @@ import importlib.util
 import os
 import sys
 
-__version__ = "2.5.0"
+__version__ = "3.0.0"
 
 # Si falla la importación del paquete, no inventar una versión antigua.
 UNKNOWN_VERSION = "desconocida"

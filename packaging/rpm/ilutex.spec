@@ -1,5 +1,5 @@
 Name:           ilutex
-Version:        2.5.0
+Version:        3.0.0
 Release:        1%{?dist}
 Summary:        iLutex — control cromático del teclado AERO X16 vía HID LampArray
 License:        MIT
