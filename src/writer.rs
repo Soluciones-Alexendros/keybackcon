@@ -1,4 +1,4 @@
-//! Candado único de escritura HID (`/run/keybackcon/writer.lock`, ADR 13).
+//! Candado único de escritura HID (`/run/ilutex/writer.lock`, ADR 13).
 //!
 //! Quien no puede abrir esa ruta de forma segura no abre el dispositivo.
 //! No hay fallback a `/var/tmp` ni a un fichero `0666`.
@@ -87,7 +87,7 @@ pub fn writer_lock_path() -> PathBuf {
     if let Some(p) = test_lock_override() {
         return p;
     }
-    PathBuf::from("/run/keybackcon/writer.lock")
+    PathBuf::from("/run/ilutex/writer.lock")
 }
 
 fn test_override() -> bool {
@@ -112,7 +112,7 @@ fn test_lock_override() -> Option<PathBuf> {
     }
 }
 
-/// El directorio instalado por `tmpfiles.d`: `root:keybackcon` y modo `0770`.
+/// El directorio instalado por `tmpfiles.d`: `root:ilutex` y modo `0770`.
 ///
 /// Contrato acoplado al fichero `0660` (KBC-01/KBC-02): no cambiar un modo
 /// sin el otro ni sin actualizar esta validación y sus pruebas.
@@ -144,10 +144,10 @@ pub fn validate_installed_parent(parent: &Path) -> io::Result<()> {
             parent.display()
         )));
     }
-    let gid = keybackcon_gid()?;
+    let gid = ilutex_gid()?;
     if meta.gid() != gid {
         return Err(denied(format!(
-            "{} no pertenece al grupo keybackcon",
+            "{} no pertenece al grupo ilutex",
             parent.display()
         )));
     }
@@ -210,13 +210,13 @@ fn open_writer_file(path: &Path, relaxed: bool) -> io::Result<File> {
     }
     if meta.uid() != 0 || mode != 0o660 {
         return Err(denied(format!(
-            "{} debe ser root:keybackcon modo 0660 (contrato tmpfiles + escritor)",
+            "{} debe ser root:ilutex modo 0660 (contrato tmpfiles + escritor)",
             path.display()
         )));
     }
-    if meta.gid() != keybackcon_gid()? {
+    if meta.gid() != ilutex_gid()? {
         return Err(denied(format!(
-            "{} no pertenece al grupo keybackcon",
+            "{} no pertenece al grupo ilutex",
             path.display()
         )));
     }
@@ -242,21 +242,21 @@ fn lock_access_hint(gid: &io::Result<u32>) -> LockAccessHint {
 fn format_open_denied(path: &Path, hint: LockAccessHint, os: &io::Error) -> String {
     match hint {
         LockAccessHint::GroupMissing => format!(
-            "no se pudo abrir el candado {}: {os}. El grupo keybackcon no existe; \
+            "no se pudo abrir el candado {}: {os}. El grupo ilutex no existe; \
              instala el paquete (sysusers.d/tmpfiles.d) antes de escribir",
             path.display()
         ),
         LockAccessHint::NotAuthorized => format!(
             "no se pudo abrir el candado {}: permiso denegado. \
              Instalar no autoriza: añade tu usuario al grupo con \
-             `sudo usermod -aG keybackcon \"$USER\"` y abre una sesión nueva \
-             (o `newgrp keybackcon`). Error del sistema: {os}",
+             `sudo usermod -aG ilutex \"$USER\"` y abre una sesión nueva \
+             (o `newgrp ilutex`). Error del sistema: {os}",
             path.display()
         ),
         LockAccessHint::StillDenied => format!(
             "no se pudo abrir el candado {}: permiso denegado pese a pertenecer \
-             al grupo keybackcon. Comprueba que el fichero sea root:keybackcon \
-             modo 0660 y el directorio /run/keybackcon modo 0770. Error: {os}",
+             al grupo ilutex. Comprueba que el fichero sea root:ilutex \
+             modo 0660 y el directorio /run/ilutex modo 0770. Error: {os}",
             path.display()
         ),
     }
@@ -268,7 +268,7 @@ fn diagnose_open_failure(path: &Path, e: &io::Error, relaxed: bool) -> io::Error
             io::ErrorKind::NotFound,
             format!(
                 "no existe el candado {}. Reinstala el paquete (tmpfiles.d) o ejecuta \
-                 `sudo systemd-tmpfiles --create keybackcon.conf`. Error: {e}",
+                 `sudo systemd-tmpfiles --create ilutex.conf`. Error: {e}",
                 path.display()
             ),
         );
@@ -279,21 +279,17 @@ fn diagnose_open_failure(path: &Path, e: &io::Error, relaxed: bool) -> io::Error
             path.display()
         ));
     }
-    denied(format_open_denied(
-        path,
-        lock_access_hint(&keybackcon_gid()),
-        e,
-    ))
+    denied(format_open_denied(path, lock_access_hint(&ilutex_gid()), e))
 }
 
-fn keybackcon_gid() -> io::Result<u32> {
-    let name = c"keybackcon";
+fn ilutex_gid() -> io::Result<u32> {
+    let name = c"ilutex";
     // SAFETY: el puntero es un literal C válido; el resultado no se retiene.
     let ptr = unsafe { getgrnam(name.as_ptr()) };
     if ptr.is_null() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
-            "el grupo keybackcon no existe; instala el paquete (sysusers.d)",
+            "el grupo ilutex no existe; instala el paquete (sysusers.d)",
         ));
     }
     // SAFETY: getgrnam devolvió un grupo; solo leemos gr_gid.
@@ -357,10 +353,7 @@ mod tests {
         let guard = crate::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let dir = PathBuf::from(format!(
-            "/tmp/keybackcon-writer-{}-{tag}",
-            std::process::id()
-        ));
+        let dir = PathBuf::from(format!("/tmp/ilutex-writer-{}-{tag}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("writer.lock");
@@ -465,10 +458,7 @@ mod tests {
 
     #[test]
     fn directorio_enlace_de_candado_se_rechaza() {
-        let dir = PathBuf::from(format!(
-            "/tmp/keybackcon-writer-link-{}",
-            std::process::id()
-        ));
+        let dir = PathBuf::from(format!("/tmp/ilutex-writer-link-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let real = dir.join("real");
@@ -482,18 +472,18 @@ mod tests {
 
     #[test]
     fn diagnostico_unificado_instalar_no_autoriza() {
-        let path = Path::new("/run/keybackcon/writer.lock");
+        let path = Path::new("/run/ilutex/writer.lock");
         let os = io::Error::from_raw_os_error(13); // EACCES
         let msg = format_open_denied(path, LockAccessHint::NotAuthorized, &os);
         assert!(msg.contains("Instalar no autoriza"), "{msg}");
-        assert!(msg.contains("usermod -aG keybackcon"), "{msg}");
+        assert!(msg.contains("usermod -aG ilutex"), "{msg}");
         assert!(
             msg.contains("sesión nueva") || msg.contains("newgrp"),
             "{msg}"
         );
 
         let missing = format_open_denied(path, LockAccessHint::GroupMissing, &os);
-        assert!(missing.contains("grupo keybackcon no existe"), "{missing}");
+        assert!(missing.contains("grupo ilutex no existe"), "{missing}");
 
         let still = format_open_denied(path, LockAccessHint::StillDenied, &os);
         assert!(still.contains("0660"), "{still}");

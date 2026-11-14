@@ -14,7 +14,7 @@ use crate::state;
 use crate::writer;
 
 /// Nombre del binario usado en la ayuda y en los errores.
-pub const BIN: &str = "keybackcon";
+pub const BIN: &str = "ilutex";
 
 /// Comando ya validado que `run` sabe ejecutar.
 pub enum Command {
@@ -81,7 +81,7 @@ pub enum BrightnessChange {
 fn help_text() -> String {
     format!(
         "uso: {BIN} <comando>\n\
-         \n  Keyboard Backlight Controls — una zona, instancia única de animación\n\
+         \n  iLutex — una zona, instancia única de animación\n\
          \n  info                     información del dispositivo (nº de lámparas, ruta hidraw)\n  set <color>              asigna color — hex 'ff6400' o nombre de predefinido\n  off                      apaga (el estado se conserva)\n  brightness <+N|-N|N>     brillo — escala RGB, persistente (alias: bright)\n  firmware-effects on|off  efectos del firmware (alias: auto)\n  animation <breathe|rainbow> [--fps N]\n                           animación en primer plano; instancia única (alias: anim)\n  stop                     detiene la animación y restaura el color base\n  restore [--on-login]     reaplica el color guardado (--on-login respeta restore_policy)\n  --help, -h               muestra esta ayuda\n  --version, -V            muestra la versión\n\
          \npredefinidos: {}",
         crate::color::PRESETS
@@ -586,7 +586,7 @@ mod tests {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let root = PathBuf::from(format!(
-            "/tmp/keybackcon-brightness-{}-{tag}",
+            "/tmp/ilutex-brightness-{}-{tag}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&root);
@@ -595,12 +595,12 @@ mod tests {
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
-            .create(state.join("keybackcon"))
+            .create(state.join("ilutex"))
             .unwrap();
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
-            .create(runtime.join("keybackcon"))
+            .create(runtime.join("ilutex"))
             .unwrap();
         let writer = runtime.join("writer.lock");
         fs::OpenOptions::new()
@@ -691,13 +691,13 @@ mod tests {
 
         // Identidad estricta (KBC-06): basename exacto de exe/argv0, no subcadena.
         // Copia del binario de test (no `sleep`/uutils multicall) para que el
-        // proceso viva y `/proc/<pid>/exe` resuelva a `keybackcon`.
+        // proceso viva y `/proc/<pid>/exe` resuelva a `ilutex`.
         let fixtures = runtime.join("fixtures");
         fs::create_dir_all(&fixtures).unwrap();
-        let anim_bin = fixtures.join("keybackcon");
+        let anim_bin = fixtures.join("ilutex");
         let _ = fs::remove_file(&anim_bin);
         fs::copy(std::env::current_exe().unwrap(), &anim_bin)
-            .expect("copiar binario de test como fixture keybackcon");
+            .expect("copiar binario de test como fixture ilutex");
         {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = fs::metadata(&anim_bin).unwrap().permissions();
@@ -711,7 +711,7 @@ mod tests {
             .spawn()
             .expect("animación falsa");
         let anim_pid = anim.id().cast_signed();
-        let pid_path = runtime.join("keybackcon/animation.pid");
+        let pid_path = runtime.join("ilutex/animation.pid");
         fs::write(&pid_path, anim_pid.to_string()).unwrap();
         // Esperar identidad completa (exe+argv0+uid): cmdline puede ir vacío
         // un instante tras exec; si validamos pronto, se borraba el pidfile.

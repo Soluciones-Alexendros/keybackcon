@@ -29,7 +29,7 @@ pub fn runtime_base() -> PathBuf {
         return p;
     }
     let uid = libc_geteuid();
-    PathBuf::from(format!("/tmp/keybackcon-{uid}"))
+    PathBuf::from(format!("/tmp/ilutex-{uid}"))
 }
 
 /// `$XDG_STATE_HOME` absoluto, o `~/.local/state`, o error si no hay `HOME`.
@@ -184,13 +184,13 @@ mod tests {
         let base = runtime_base();
         let s = base.to_string_lossy();
         assert!(
-            s.starts_with("/tmp/keybackcon-"),
+            s.starts_with("/tmp/ilutex-"),
             "esperado fallback por UID, obtuvo {s}"
         );
     }
 
     fn scratch(tag: &str) -> PathBuf {
-        let dir = PathBuf::from(format!("/tmp/keybackcon-xdg-{}-{tag}", std::process::id()));
+        let dir = PathBuf::from(format!("/tmp/ilutex-xdg-{}-{tag}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::DirBuilder::new()
             .mode(0o700)

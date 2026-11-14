@@ -217,7 +217,7 @@ impl Lamp<HidRaw> {
             io::Error::new(
                 io::ErrorKind::NotFound,
                 "no se encontró el dispositivo LampArray admitido (VID 0414 / PID 8104); \
-                 ¿está cargada la regla udev? mira con 'keybackcon info'",
+                 ¿está cargada la regla udev? mira con 'ilutex info'",
             )
         })
     }

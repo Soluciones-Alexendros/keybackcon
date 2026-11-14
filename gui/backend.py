@@ -141,7 +141,7 @@ class BackendQueue:
         self._pending: dict[str, Intent] = {}
         self._lock = threading.Lock()
         self._closed = False
-        self._thread = threading.Thread(target=self._loop, name="keybackcon-backend", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="ilutex-backend", daemon=True)
         self._thread.start()
 
     def submit(self, intent: Intent) -> None:

@@ -53,6 +53,6 @@ def check_gui_requirements() -> tuple[bool, str]:
             False,
             f"Se necesita libadwaita ≥ 1.{MIN_ADW_MINOR} (API ToolbarView/"
             f"PreferencesDialog/AlertDialog). Encontrado {adw[0]}.{adw[1]}.{adw[2]}. "
-            "En Debian 12 la mesa de luz no está soportada; usa el CLI `keybackcon`.",
+            "En Debian 12 la mesa de luz no está soportada; usa el CLI `ilutex`.",
         )
     return True, f"GTK {gtk[0]}.{gtk[1]} · Adw {adw[0]}.{adw[1]}.{adw[2]}"

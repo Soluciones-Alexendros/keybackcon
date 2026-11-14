@@ -1,4 +1,4 @@
-# Keyboard Backlight Controls (`keybackcon`)
+# iLutex
 
 [![CI](https://github.com/Soluciones-Alexendros/keybackcon/actions/workflows/ci.yml/badge.svg)](https://github.com/Soluciones-Alexendros/keybackcon/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Soluciones-Alexendros/keybackcon)](https://github.com/Soluciones-Alexendros/keybackcon/releases)
@@ -15,46 +15,46 @@ intensidad y listo. Desde terminal o con mesa de luz gráfica, todo en castellan
 </p>
 
 La mesa de luz vive también en la **bandeja del sistema**
-(`keybackcon-gui --tray`) y sigue el tema claro/oscuro de tu escritorio.
+(`ilutex-gui --tray`) y sigue el tema claro/oscuro de tu escritorio.
 
 ## Empieza en 3 pasos
 
 1. Instala el `.deb` desde la
    [release](https://github.com/Soluciones-Alexendros/keybackcon/releases)
    (o el script local; ver abajo).
-2. Fija un color: `keybackcon set ff7800`.
-3. Abre la mesa de luz: `keybackcon-gui` (requiere GTK4 y libadwaita ≥ 1.5).
+2. Fija un color: `ilutex set ff7800`.
+3. Abre la mesa de luz: `ilutex-gui` (requiere GTK4 y libadwaita ≥ 1.5).
 
 ## Instalación
 
 1. **Ubuntu/Debian (`.deb`, canal principal de GUI+CLI):** descarga el `.deb`
    de cada [release](https://github.com/Soluciones-Alexendros/keybackcon/releases)
-   e instala con `sudo apt install ./keybackcon_X.Y.Z-1_amd64.deb`
+   e instala con `sudo apt install ./ilutex_X.Y.Z-1_amd64.deb`
    (binario, GUI, icono, regla udev y unidades de usuario). Debian 12:
    el CLI funciona; la mesa de luz nativa exige libadwaita ≥ 1.5 (ver matriz).
 2. **Script local (`~/.local`):** `./scripts/install.sh`
    (pide sudo para udev, sysusers y tmpfiles).
-3. **npm (solo CLI):** `npm install -g keybackcon` instala el binario
+3. **npm (solo CLI):** `npm install -g ilutex` instala el binario
    precompilado (Linux x86_64/arm64) y, si el postinstalador lo permite, la
    regla udev y unidades de usuario. **No** incluye la mesa de luz GTK ni
-   sus recursos. Omite udev con `KEYBACKCON_SKIP_UDEV=1`.
+   sus recursos. Omite udev con `ILUTEX_SKIP_UDEV=1`.
 4. **Arch (AUR):** el empaquetado existe en el árbol del repo; la publicación
    AUR y los checksums **no están verificados** en esta revisión. No uses
-   `yay -S keybackcon` como canal acreditado hasta que la matriz lo marque
+   `yay -S ilutex` como canal acreditado hasta que la matriz lo marque
    como probado. Mientras tanto: script local o binario de la release.
 5. **Fedora:** usa el script local o el CLI de npm. El empaquetado RPM **no
    está verificado** aún.
 
-**Instalar ≠ autorizar.** El paquete crea el grupo `keybackcon` y el candado
-`/run/keybackcon/writer.lock`, pero **no** añade tu usuario al grupo. Para
+**Instalar ≠ autorizar.** El paquete crea el grupo `ilutex` y el candado
+`/run/ilutex/writer.lock`, pero **no** añade tu usuario al grupo. Para
 escribir al teclado:
 
 ```bash
-sudo usermod -aG keybackcon "$USER"
-# cierra sesión y vuelve a entrar (o: newgrp keybackcon)
+sudo usermod -aG ilutex "$USER"
+# cierra sesión y vuelve a entrar (o: newgrp ilutex)
 ```
 
-Cada release trae además el tarball `keybackcon-vX.Y.Z-linux-x86_64.tar.gz`,
+Cada release trae además el tarball `ilutex-vX.Y.Z-linux-x86_64.tar.gz`,
 `SHA256SUMS` y SBOM CycloneDX (inventario del crate Rust; la GUI tiene
 dependencias de sistema aparte).
 
@@ -75,7 +75,7 @@ La mesa de luz necesita **GTK 4** y **libadwaita ≥ 1.5**. La bandeja
 | Arch | script / release | Candidato | Candidato; AUR no acreditado |
 | Fedora | script / npm CLI | Candidato | Candidato; RPM no verificado |
 | openSUSE | — | Fuera del alcance anunciado | — |
-| npm | `npm i -g keybackcon` | Sí (solo binario) | No incluida |
+| npm | `npm i -g ilutex` | Sí (solo binario) | No incluida |
 
 `install.sh` y la GUI detectan la distro (`/etc/os-release`) y proponen el
 comando de paquetes cuando falta algo. Sin systemd: udev y CLI siguen
@@ -90,15 +90,24 @@ Contrato de brillo, apagado, restauración y JSON:
 
 | Comando | Efecto |
 |---|---|
-| `keybackcon set ff7800` | Fija color (hex, `#hex` o nombre: red, blue, orange…) |
-| `keybackcon brightness 60` | Ajusta intensidad (o `+10` / `-10`) |
-| `keybackcon animation breathe` | Anima (`breathe` o `rainbow`); `stop` la para |
-| `keybackcon off` | Apaga (conserva tu color) |
-| `keybackcon restore` | Reaplica tu color guardado (p. ej. al iniciar sesión) |
-| `keybackcon info` | Muestra dispositivo y estado |
-| `keybackcon-gui --tray` | Mesa de luz (solo bandeja con `--tray`) |
+| `ilutex set ff7800` | Fija color (hex, `#hex` o nombre: red, blue, orange…) |
+| `ilutex brightness 60` | Ajusta intensidad (o `+10` / `-10`) |
+| `ilutex animation breathe` | Anima (`breathe` o `rainbow`); `stop` la para |
+| `ilutex off` | Apaga (conserva tu color) |
+| `ilutex restore` | Reaplica tu color guardado (p. ej. al iniciar sesión) |
+| `ilutex info` | Muestra dispositivo y estado |
+| `ilutex-gui --tray` | Mesa de luz (solo bandeja con `--tray`) |
 
-Atajos de la GUI: `Ctrl+1…9` cambia de filtro, `+`/`−` ajusta intensidad.
+Atajos de la GUI: `Ctrl+1…9` cambia de filtro, `+`/`−` ajusta intensidad, `?` muestra ayuda, `Q` sale.
+
+| Atajo | Acción |
+|---|---|
+| `?` / `Shift + /` | Tabla de atajos en pantalla |
+| `Q` | Salir (pregunta si hay un cambio pendiente) |
+| `Enter` / `Espacio` | Fijar luz continua con el color actual |
+| `Ctrl + 1…9` | Elegir filtro por posición |
+| `+` / `−` | Subir o bajar el brillo |
+| Flechas | Recorrer los filtros |
 
 Idioma: la mesa de luz sigue el locale del sistema y trae catálogos
 completos en **español** e **inglés** (cae a español si el locale no está
@@ -110,7 +119,7 @@ soportado). El CLI no se traduce.
   demonio privilegiado en medio.
 - Tu color y brillo se guardan y sobreviven a reinicios. Ajustar el brillo
   **no** detiene una animación en curso (la animación relee el porcentaje).
-- Solo hay una escritura a la vez (candado `/run/keybackcon/writer.lock`).
+- Solo hay una escritura a la vez (candado `/run/ilutex/writer.lock`).
   Fijar color o pedir `stop` detiene la animación antes de volver a escribir.
 
 Detalle técnico (HID LampArray, informes, estado): [`docs/architecture/protocol.md`](docs/architecture/protocol.md),
@@ -120,10 +129,9 @@ diseño en [`ARCHITECTURE.md`](ARCHITECTURE.md) y decisiones en [`docs/architect
 
 | Síntoma | Qué hacer |
 |---|---|
-| No encuentra el teclado | Revisa la conexión y prueba `keybackcon info` |
+| No encuentra el teclado | Revisa la conexión y prueba `ilutex info` |
 | Permiso denegado en `/dev/hidraw*` | `sudo udevadm trigger` y **vuelve a iniciar sesión** |
-| Permiso denegado al candado / «Instalar no autoriza» | `sudo usermod -aG keybackcon "$USER"` y sesión nueva |
-| La animación no para | `keybackcon stop` |
+| La animación no para | `ilutex stop` |
 
 Runbook: [`docs/runbooks/dispositivo.md`](docs/runbooks/dispositivo.md).
 
@@ -133,7 +141,7 @@ Runbook: [`docs/runbooks/dispositivo.md`](docs/runbooks/dispositivo.md).
 Índice de documentos: [`docs/README.md`](docs/README.md).
 
 ```bash
-make validate   # lint + test + smoke
+make validate   # lint + test + smoke + check-version
 ```
 
 ## Contratos

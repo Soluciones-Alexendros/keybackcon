@@ -1,18 +1,18 @@
 # Maintainer: Alexendros <operaciones@alexendros.dev>
 # shellcheck shell=bash
 # shellcheck disable=SC2034,SC2154
-pkgname=keybackcon
-pkgver=2.5.0
+pkgname=ilutex
+pkgver=3.0.0
 pkgrel=1
-pkgdesc="Control RGB del teclado AERO X16 vía HID LampArray"
+pkgdesc="iLutex — control cromático del teclado AERO X16 vía HID LampArray"
 arch=('x86_64')
 url="https://github.com/Soluciones-Alexendros/keybackcon"
 license=('MIT')
 depends=()
-optdepends=('python-gobject: panel gráfico keybackcon-gui' 'gtk4: panel gráfico keybackcon-gui' 'libadwaita: panel gráfico keybackcon-gui' 'libayatana-appindicator: indicador de bandeja para keybackcon-gui' 'python-cairo: indicador de bandeja para keybackcon-gui')
+optdepends=('python-gobject: panel gráfico ilutex-gui' 'gtk4: panel gráfico ilutex-gui' 'libadwaita: panel gráfico ilutex-gui' 'libayatana-appindicator: indicador de bandeja para ilutex-gui' 'python-cairo: indicador de bandeja para ilutex-gui')
 makedepends=('cargo' 'gettext')
-conflicts=('kbd-rgb')
-replaces=('kbd-rgb')
+conflicts=('kbd-rgb' 'keybackcon')
+replaces=('kbd-rgb' 'keybackcon')
 # No anunciar AUR hasta checksum real + .SRCINFO + chroot (ver docs/compatibility/matriz.md).
 # Sustituir SKIP con `updpkgsums` antes de publicar.
 sha256sums=('SKIP')
@@ -24,24 +24,24 @@ build() {
   for po in po/*.po; do
     lang="${po##*/}"; lang="${lang%.po}"
     mkdir -p "gui/locale/${lang}/LC_MESSAGES"
-    msgfmt -o "gui/locale/${lang}/LC_MESSAGES/keybackcon.mo" "${po}"
+    msgfmt -o "gui/locale/${lang}/LC_MESSAGES/ilutex.mo" "${po}"
   done
 }
 
 package() {
   cd "${pkgname}-${pkgver}" || return 1
-  install -Dm755 target/release/keybackcon "${pkgdir}/usr/bin/keybackcon"
-  install -Dm755 packaging/keybackcon-gui "${pkgdir}/usr/bin/keybackcon-gui"
-  install -Dm644 gui/*.py "${pkgdir}/usr/share/keybackcon/gui/"
-  install -Dm644 packaging/desktop/keybackcon.desktop "${pkgdir}/usr/share/applications/keybackcon.desktop"
-  install -Dm644 assets/icons/keybackcon.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/keybackcon.svg"
-  install -Dm644 packaging/udev/70-keybackcon.rules "${pkgdir}/usr/lib/udev/rules.d/70-keybackcon.rules"
-  install -Dm644 packaging/systemd/keybackcon.service "${pkgdir}/usr/lib/systemd/user/keybackcon.service"
-  install -Dm644 packaging/systemd/keybackcon-animation@.service "${pkgdir}/usr/lib/systemd/user/keybackcon-animation@.service"
-  for mo in gui/locale/*/LC_MESSAGES/keybackcon.mo; do
+  install -Dm755 target/release/ilutex "${pkgdir}/usr/bin/ilutex"
+  install -Dm755 packaging/ilutex-gui "${pkgdir}/usr/bin/ilutex-gui"
+  install -Dm644 gui/*.py "${pkgdir}/usr/share/ilutex/gui/"
+  install -Dm644 packaging/desktop/ilutex.desktop "${pkgdir}/usr/share/applications/ilutex.desktop"
+  install -Dm644 assets/icons/ilutex.svg "${pkgdir}/usr/share/icons/hicolor/scalable/apps/ilutex.svg"
+  install -Dm644 packaging/udev/70-ilutex.rules "${pkgdir}/usr/lib/udev/rules.d/70-ilutex.rules"
+  install -Dm644 packaging/systemd/ilutex.service "${pkgdir}/usr/lib/systemd/user/ilutex.service"
+  install -Dm644 packaging/systemd/ilutex-animation@.service "${pkgdir}/usr/lib/systemd/user/ilutex-animation@.service"
+  for mo in gui/locale/*/LC_MESSAGES/ilutex.mo; do
     lang="${mo#gui/locale/}"; lang="${lang%%/*}"
-    install -Dm644 "${mo}" "${pkgdir}/usr/share/locale/${lang}/LC_MESSAGES/keybackcon.mo"
+    install -Dm644 "${mo}" "${pkgdir}/usr/share/locale/${lang}/LC_MESSAGES/ilutex.mo"
   done
-  install -Dm644 gui/org.iniciativas.keybackcon.gschema.xml "${pkgdir}/usr/share/glib-2.0/schemas/org.iniciativas.keybackcon.gschema.xml"
+  install -Dm644 gui/org.alexendros.ilutex.gschema.xml "${pkgdir}/usr/share/glib-2.0/schemas/org.alexendros.ilutex.gschema.xml"
   install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

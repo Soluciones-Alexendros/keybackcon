@@ -23,6 +23,13 @@ hex_to_rgb = _colors.hex_to_rgb
 hsv_to_rgb = _colors.hsv_to_rgb
 COLORES = _colors.COLORES
 
+from gui.constants import (
+    BRILLO_PASO,
+    BRIGHTNESS_DEBOUNCE_MS,
+    STATE_POLL_SECONDS,
+    TRAY_TICK_SECONDS,
+)
+
 
 class TrayUnavailable(Exception):
     pass
@@ -49,7 +56,6 @@ except Exception as exc:
 
 
 MODES = ("fijar", "breathe", "rainbow", "off")
-BRILLO_PASO = 5
 
 
 def _normalize_hex(color_hex):
@@ -81,7 +87,7 @@ def _clamp_brightness(value):
 
 def _cache_dir():
     base = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-    path = os.path.join(base, "keybackcon")
+    path = os.path.join(base, "ilutex")
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -175,11 +181,11 @@ class TrayIndicator:
             log_exc("estado inicial de bandeja")
         self._visible = True
         self._indicator = AyatanaAppIndicator3.Indicator.new(
-            "keybackcon",
-            "keybackcon",
+            "ilutex",
+            "ilutex",
             AyatanaAppIndicator3.IndicatorCategory.HARDWARE,
         )
-        self._indicator.set_title("keybackcon")
+        self._indicator.set_title("iLutex")
         self._indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
         self._build_menu()
         self._render_icon()
@@ -194,7 +200,7 @@ class TrayIndicator:
             except Exception:
                 continue
         try:
-            GLib.timeout_add_seconds(2, self._tick)
+            GLib.timeout_add_seconds(TRAY_TICK_SECONDS, self._tick)
         except Exception:
             log_exc("temporizador de bandeja")
 
@@ -429,7 +435,7 @@ class TrayIndicator:
             log_exc("icono de bandeja")
             return
         try:
-            self._indicator.set_icon_full(path, "keybackcon")
+            self._indicator.set_icon_full(path, "ilutex")
         except Exception:
             try:
                 self._indicator.set_icon(path)
@@ -489,7 +495,7 @@ class TrayIndicator:
                 GLib.source_remove(self._bright_source)
             except Exception:
                 log_exc("cancelar brillo pendiente")
-        self._bright_source = GLib.timeout_add(150, self._aplicar_brillo, pct)
+        self._bright_source = GLib.timeout_add(BRIGHTNESS_DEBOUNCE_MS, self._aplicar_brillo, pct)
 
     def _aplicar_brillo(self, pct):
         self._bright_source = None

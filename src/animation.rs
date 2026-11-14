@@ -1,7 +1,7 @@
 //! Animación en primer plano (`breathe`/`rainbow`) y parada tipada (ADR 13).
 //!
 //! El derecho de escritura lo da el candado común
-//! `/run/keybackcon/writer.lock` ([`crate::writer`]). El pidfile solo anota
+//! `/run/ilutex/writer.lock` ([`crate::writer`]). El pidfile solo anota
 //! el PID mientras ese candado está tomado; no otorga el derecho de escribir.
 
 use std::fs;
@@ -31,7 +31,9 @@ const SIGTERM: i32 = 15;
 pub const MAX_FPS: u64 = 60;
 
 /// Binarios de animación reconocidos (basename exacto de `/proc/<pid>/exe` y argv0).
-const KNOWN_ANIM_BASENAMES: &[&str] = &["keybackcon", "kbd-rgb"];
+/// Los dos últimos son los nombres anteriores: una animación lanzada antes del
+/// renombrado sigue siendo nuestra y hay que poder pararla.
+const KNOWN_ANIM_BASENAMES: &[&str] = &["ilutex", "keybackcon", "kbd-rgb"];
 
 /// Syscalls `pidfd_open` / `pidfd_send_signal` (Linux; mismos nº en `x86_64` y `aarch64`).
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
@@ -85,18 +87,19 @@ fn install_signal_handlers() {
     }
 }
 
-fn runtime_keybackcon_dir() -> PathBuf {
-    xdg::runtime_base().join("keybackcon")
+fn runtime_ilutex_dir() -> PathBuf {
+    xdg::runtime_base().join("ilutex")
 }
 
 /// Ruta del pidfile de la animación.
 pub fn pid_file() -> PathBuf {
-    runtime_keybackcon_dir().join("animation.pid")
+    runtime_ilutex_dir().join("animation.pid")
 }
 
 fn legacy_pid_files() -> Vec<PathBuf> {
     let base = xdg::runtime_base();
     vec![
+        base.join("keybackcon/animation.pid"),
         base.join("kbd-rgb/anim.pid"),
         base.join("keybackcon/anim.pid"),
     ]
@@ -172,7 +175,7 @@ fn read_argv0_basename(pid: i32) -> Option<String> {
 }
 
 /// Verifica ejecutable, argv0, propietario e identidad temporal (KBC-06).
-/// Rechaza subcadenas incidentales (`decoy-keybackcon-tool`); acepta el
+/// Rechaza subcadenas incidentales (`decoy-ilutex-tool`); acepta el
 /// binario legado real `kbd-rgb` solo por basename exacto de exe/argv0.
 fn validate_animation_pid(pid: i32) -> Option<ValidatedAnim> {
     if !pid_exists(pid) || pid_is_zombie(pid) {
@@ -257,7 +260,7 @@ pub fn animation_pid_alive() -> Option<i32> {
     animation_validated_alive().map(|v| v.pid)
 }
 
-fn pidfile_references_keybackcon() -> bool {
+fn pidfile_references_ilutex() -> bool {
     for path in std::iter::once(pid_file()).chain(legacy_pid_files()) {
         let Some(pid) = read_pid(&path) else {
             continue;
@@ -353,7 +356,7 @@ fn process_still_target(target: ValidatedAnim) -> bool {
 pub fn stop_animation() -> StopResult {
     let me = std::process::id().cast_signed();
     let live = animation_validated_alive();
-    let had = live.is_some() || pidfile_references_keybackcon();
+    let had = live.is_some() || pidfile_references_ilutex();
     if let Some(target) = live {
         if target.pid != me {
             let signaled = signal_validated_animation(target);
@@ -561,15 +564,12 @@ mod tests {
         let guard = crate::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let dir = PathBuf::from(format!(
-            "/tmp/keybackcon-runtime-{}-{tag}",
-            std::process::id()
-        ));
+        let dir = PathBuf::from(format!("/tmp/ilutex-runtime-{}-{tag}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
-            .create(dir.join("keybackcon"))
+            .create(dir.join("ilutex"))
             .expect("crear runtime de prueba");
         let lock = dir.join("writer.lock");
         let file = fs::OpenOptions::new()
@@ -601,7 +601,7 @@ mod tests {
 
     /// Copia del binario de test con basename exacto (exe + argv0).
     /// No usamos `sleep`: en runners con rust-coreutils/uutils el multicall
-    /// muere al renombrarse (`coreutils: unknown program 'keybackcon'`).
+    /// muere al renombrarse (`coreutils: unknown program 'ilutex'`).
     /// Copiamos (no hardlink) para que `/proc/<pid>/exe` resuelva a `name`.
     fn fixture_anim_bin(runtime: &Path, name: &str) -> PathBuf {
         let fixtures = runtime.join("fixtures");
@@ -656,9 +656,9 @@ mod tests {
     #[test]
     fn stop_sin_pidfile_es_no_habia() {
         let (tmp, _env) = tmp_runtime("obsoleto");
-        fs::write(tmp.join("keybackcon/animation.pid"), "2147483647").unwrap();
+        fs::write(tmp.join("ilutex/animation.pid"), "2147483647").unwrap();
         assert_eq!(stop_animation(), StopResult::NoHabia);
-        assert!(!tmp.join("keybackcon/animation.pid").exists());
+        assert!(!tmp.join("ilutex/animation.pid").exists());
         let _ = fs::remove_dir_all(&tmp);
     }
 
@@ -670,9 +670,9 @@ mod tests {
             tmp,
             "XDG_RUNTIME_DIR debe apuntar al tmp del test"
         );
-        let mut child = live_named_child(&tmp, "keybackcon", "3");
-        wait_exe_basename(child.id(), "keybackcon");
-        let pf = tmp.join("keybackcon/animation.pid");
+        let mut child = live_named_child(&tmp, "ilutex", "3");
+        wait_exe_basename(child.id(), "ilutex");
+        let pf = tmp.join("ilutex/animation.pid");
         let pid_i = child.id().cast_signed();
         fs::write(&pf, pid_i.to_string()).unwrap();
         assert_eq!(pid_file(), pf);
@@ -703,11 +703,11 @@ mod tests {
         let (tmp, _env) = tmp_runtime("reciclado");
         let mut child = Command::new("sleep").arg("30").spawn().unwrap();
         let pid = child.id().cast_signed();
-        fs::write(tmp.join("keybackcon/animation.pid"), pid.to_string()).unwrap();
+        fs::write(tmp.join("ilutex/animation.pid"), pid.to_string()).unwrap();
         assert_eq!(stop_animation(), StopResult::NoHabia);
         assert!(
             Path::new(&format!("/proc/{pid}")).exists(),
-            "un PID reciclado que ya no es keybackcon no se señaliza"
+            "un PID reciclado que ya no es ilutex no se señaliza"
         );
         let _ = child.kill();
         let _ = child.wait();
@@ -719,15 +719,15 @@ mod tests {
     #[test]
     fn kbc06_pid_alive_rechaza_cmdline_con_subcadena_ajena() {
         let (tmp, _env) = tmp_runtime("subcadena-ajena");
-        let mut child = live_named_child(&tmp, "decoy-keybackcon-tool", "8");
-        wait_exe_basename(child.id(), "decoy-keybackcon-tool");
+        let mut child = live_named_child(&tmp, "decoy-ilutex-tool", "8");
+        wait_exe_basename(child.id(), "decoy-ilutex-tool");
         let pid = child.id().cast_signed();
-        let pf = tmp.join("keybackcon/animation.pid");
+        let pf = tmp.join("ilutex/animation.pid");
         fs::write(&pf, pid.to_string()).unwrap();
         assert_eq!(
             pid_alive_at(&pf),
             None,
-            "KBC-06: decoy-keybackcon-tool no debe pasar la identidad estricta"
+            "KBC-06: decoy-ilutex-tool no debe pasar la identidad estricta"
         );
         assert!(
             Path::new(&format!("/proc/{pid}")).exists(),
@@ -745,7 +745,7 @@ mod tests {
         let mut legacy = live_named_child(&tmp, "kbd-rgb", "8");
         wait_exe_basename(legacy.id(), "kbd-rgb");
         let legacy_pid = legacy.id().cast_signed();
-        let pf = tmp.join("keybackcon/animation.pid");
+        let pf = tmp.join("ilutex/animation.pid");
         fs::write(&pf, legacy_pid.to_string()).unwrap();
         let got = pid_alive_at(&pf);
         assert_eq!(
@@ -765,10 +765,10 @@ mod tests {
     #[test]
     fn kbc07_stop_no_senala_decoy_ni_ajeno() {
         let (tmp, _env) = tmp_runtime("kbc07-decoy");
-        let mut decoy = live_named_child(&tmp, "decoy-keybackcon-tool", "30");
-        wait_exe_basename(decoy.id(), "decoy-keybackcon-tool");
+        let mut decoy = live_named_child(&tmp, "decoy-ilutex-tool", "30");
+        wait_exe_basename(decoy.id(), "decoy-ilutex-tool");
         let pid = decoy.id().cast_signed();
-        fs::write(tmp.join("keybackcon/animation.pid"), pid.to_string()).unwrap();
+        fs::write(tmp.join("ilutex/animation.pid"), pid.to_string()).unwrap();
         assert_eq!(stop_animation(), StopResult::NoHabia);
         assert!(
             Path::new(&format!("/proc/{pid}")).exists(),
@@ -794,7 +794,7 @@ mod tests {
     #[test]
     fn stop_con_zombie_es_detenida() {
         let (tmp, _env) = tmp_runtime("zombie-stop");
-        let mut child = live_named_child(&tmp, "keybackcon", "0");
+        let mut child = live_named_child(&tmp, "ilutex", "0");
         let pid = child.id().cast_signed();
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
@@ -810,7 +810,7 @@ mod tests {
             assert!(Instant::now() < deadline, "el hijo no quedó zombie");
             std::thread::sleep(Duration::from_millis(10));
         }
-        fs::write(tmp.join("keybackcon/animation.pid"), pid.to_string()).unwrap();
+        fs::write(tmp.join("ilutex/animation.pid"), pid.to_string()).unwrap();
         // Un zombie de binario conocido cuenta como «había animación».
         let r = stop_animation();
         assert!(

@@ -1,4 +1,4 @@
-//! Estado persistente versionado en `$XDG_STATE_HOME/keybackcon/state`,
+//! Estado persistente versionado en `$XDG_STATE_HOME/ilutex/state`,
 //! con lectura heredada de `kbd-rgb/state` y del formato plano `<hex> <pct>`.
 //!
 //! Las actualizaciones RMW (brillo, modo) toman un `flock` breve sobre
@@ -62,20 +62,25 @@ fn state_base() -> io::Result<PathBuf> {
 
 /// Ruta del estado nuevo. Falla si no hay `HOME` ni `XDG_STATE_HOME` absolutos.
 pub fn state_file() -> io::Result<PathBuf> {
-    Ok(state_base()?.join("keybackcon/state"))
+    Ok(state_base()?.join("ilutex/state"))
 }
 
 /// Candado breve de transacciones RMW del estado (no del HID).
 pub fn state_lock_file() -> io::Result<PathBuf> {
-    Ok(state_base()?.join("keybackcon/state.lock"))
+    Ok(state_base()?.join("ilutex/state.lock"))
 }
 
-fn legacy_state_file() -> io::Result<PathBuf> {
-    Ok(state_base()?.join("kbd-rgb/state"))
+/// Ficheros de estado anteriores al nombre `ilutex`; se leen si el actual no existe.
+fn legacy_state_files() -> io::Result<Vec<PathBuf>> {
+    let base = state_base()?;
+    Ok(vec![
+        base.join("keybackcon/state"),
+        base.join("kbd-rgb/state"),
+    ])
 }
 
 fn animation_run_file() -> PathBuf {
-    xdg::runtime_base().join("keybackcon/animation.run")
+    xdg::runtime_base().join("ilutex/animation.run")
 }
 
 /// `flock` exclusivo bloqueante sobre `state.lock`. Secciones críticas cortas.
@@ -278,12 +283,14 @@ pub fn load_persisted() -> io::Result<PersistedState> {
     match fs::read_to_string(&primary) {
         Ok(raw) => outcome_to_result(&primary, parse_state_text(&raw)),
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            let legacy = legacy_state_file()?;
-            match fs::read_to_string(&legacy) {
-                Ok(raw) => outcome_to_result(&legacy, parse_state_text(&raw)),
-                Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(PersistedState::default()),
-                Err(e) => Err(e),
+            for legacy in legacy_state_files()? {
+                match fs::read_to_string(&legacy) {
+                    Ok(raw) => return outcome_to_result(&legacy, parse_state_text(&raw)),
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(e),
+                }
             }
+            Ok(PersistedState::default())
         }
         Err(e) => Err(e),
     }
@@ -476,7 +483,7 @@ mod tests {
     #[test]
     fn state_migra_desde_legado() {
         let mut env = crate::EnvGuard::lock();
-        let tmp = PathBuf::from(format!("/tmp/keybackcon-state-{}", std::process::id()));
+        let tmp = PathBuf::from(format!("/tmp/ilutex-state-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("kbd-rgb")).unwrap();
         fs::write(tmp.join("kbd-rgb/state"), "ff7800 60\n").unwrap();
@@ -489,13 +496,13 @@ mod tests {
     #[test]
     fn save_state_es_atómico_y_versionado() {
         let mut env = crate::EnvGuard::lock();
-        let tmp = PathBuf::from(format!("/tmp/keybackcon-state-save-{}", std::process::id()));
+        let tmp = PathBuf::from(format!("/tmp/ilutex-state-save-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         env.set("XDG_STATE_HOME", &tmp);
         save_state((255, 120, 0), 60).unwrap();
         assert_eq!(load_state().unwrap(), ((255, 120, 0), 60));
-        let raw = fs::read_to_string(tmp.join("keybackcon/state")).unwrap();
+        let raw = fs::read_to_string(tmp.join("ilutex/state")).unwrap();
         assert!(raw.contains("schema_version=1"));
         assert!(raw.contains("base_color=ff7800"));
         set_runtime_mode("breathe", "on").unwrap();
@@ -507,21 +514,15 @@ mod tests {
     #[test]
     fn kbc05_limpieza_obsoleta_no_pisa_off() {
         let mut env = crate::EnvGuard::lock();
-        let tmp = PathBuf::from(format!(
-            "/tmp/keybackcon-state-kbc05-{}",
-            std::process::id()
-        ));
-        let runtime = PathBuf::from(format!(
-            "/tmp/keybackcon-runtime-kbc05-{}",
-            std::process::id()
-        ));
+        let tmp = PathBuf::from(format!("/tmp/ilutex-state-kbc05-{}", std::process::id()));
+        let runtime = PathBuf::from(format!("/tmp/ilutex-runtime-kbc05-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         let _ = fs::remove_dir_all(&runtime);
         fs::create_dir_all(&tmp).unwrap();
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
-            .create(runtime.join("keybackcon"))
+            .create(runtime.join("ilutex"))
             .unwrap();
         env.set("XDG_STATE_HOME", &tmp);
         env.set("XDG_RUNTIME_DIR", &runtime);
@@ -549,7 +550,7 @@ mod tests {
     fn kbc03_update_brightness_serializa_dos_ups() {
         let mut env = crate::EnvGuard::lock();
         let tmp = PathBuf::from(format!(
-            "/tmp/keybackcon-state-kbc03-txn-{}",
+            "/tmp/ilutex-state-kbc03-txn-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&tmp);
@@ -571,12 +572,9 @@ mod tests {
         let _env = crate::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let tmp = PathBuf::from(format!(
-            "/tmp/keybackcon-state-kbc12-{}",
-            std::process::id()
-        ));
+        let tmp = PathBuf::from(format!("/tmp/ilutex-state-kbc12-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
-        let dir = tmp.join("keybackcon");
+        let dir = tmp.join("ilutex");
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("state");
         let trunc = "schema_version=1\nbase_color=\nbrightness=40\n";
@@ -607,10 +605,7 @@ mod tests {
         let _env = crate::TEST_ENV_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let tmp = PathBuf::from(format!(
-            "/tmp/keybackcon-state-kbc15-{}",
-            std::process::id()
-        ));
+        let tmp = PathBuf::from(format!("/tmp/ilutex-state-kbc15-{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         unsafe {
@@ -622,18 +617,18 @@ mod tests {
             ..Default::default()
         };
         save_persisted(&st).unwrap();
-        let state_path = tmp.join("keybackcon/state");
+        let state_path = tmp.join("ilutex/state");
         let meta = fs::metadata(&state_path).unwrap();
         assert_eq!(meta.permissions().mode() & 0o777, 0o600);
 
-        let tmp_path = tmp.join(format!("keybackcon/.state-{}.tmp", std::process::id()));
+        let tmp_path = tmp.join(format!("ilutex/.state-{}.tmp", std::process::id()));
         fs::write(&tmp_path, b"stale").unwrap();
         save_persisted(&st).unwrap();
         assert!(!tmp_path.exists());
 
         fs::write(&tmp_path, b"x").unwrap();
         fs::remove_file(&tmp_path).unwrap();
-        std::os::unix::fs::symlink("/tmp/keybackcon-kbc15-nowhere", &tmp_path).unwrap();
+        std::os::unix::fs::symlink("/tmp/ilutex-kbc15-nowhere", &tmp_path).unwrap();
         let err = save_persisted(&st).unwrap_err();
         assert!(
             err.to_string().contains("enlace") || err.kind() == io::ErrorKind::PermissionDenied,

@@ -1,12 +1,12 @@
 ---
 name: Bug
-description: Comportamiento incorrecto de keybackcon
+description: Comportamiento incorrecto de iLutex
 ---
 
 ## Comando y salida
 
 ```bash
-# keybackcon … o keybackcon-gui … + salida relevante
+# ilutex … o ilutex-gui … + salida relevante
 ```
 
 ## Esperado vs obtenido
@@ -19,4 +19,4 @@ description: Comportamiento incorrecto de keybackcon
 
 ## Entorno
 
-<!-- distro, `keybackcon --version`, commit/branch -->
+<!-- distro, `ilutex --version`, commit/branch -->

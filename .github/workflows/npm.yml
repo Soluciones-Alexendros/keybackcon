@@ -1,6 +1,6 @@
 name: NPM
-# Publica en npm el meta-paquete `keybackcon` y los paquetes de binario por
-# plataforma (keybackcon-linux-x64, keybackcon-linux-arm64), todos con la
+# Publica en npm el meta-paquete `ilutex` y los paquetes de binario por
+# plataforma (ilutex-linux-x64, ilutex-linux-arm64), todos con la
 # versión del tag. Requiere el secret NPM_TOKEN de la organización.
 on:
   push:
@@ -22,12 +22,12 @@ jobs:
       - run: cargo build --release
       - run: |
           mkdir -p npm/platforms/linux-x64/bin
-          cp target/release/keybackcon npm/platforms/linux-x64/bin/keybackcon
-          chmod +x npm/platforms/linux-x64/bin/keybackcon
+          cp target/release/ilutex npm/platforms/linux-x64/bin/ilutex
+          chmod +x npm/platforms/linux-x64/bin/ilutex
       - uses: actions/upload-artifact@v4
         with:
-          name: keybackcon-linux-x64
-          path: npm/platforms/linux-x64/bin/keybackcon
+          name: ilutex-linux-x64
+          path: npm/platforms/linux-x64/bin/ilutex
 
   build-arm64:
     runs-on: ubuntu-24.04-arm
@@ -37,12 +37,12 @@ jobs:
       - run: cargo build --release
       - run: |
           mkdir -p npm/platforms/linux-arm64/bin
-          cp target/release/keybackcon npm/platforms/linux-arm64/bin/keybackcon
-          chmod +x npm/platforms/linux-arm64/bin/keybackcon
+          cp target/release/ilutex npm/platforms/linux-arm64/bin/ilutex
+          chmod +x npm/platforms/linux-arm64/bin/ilutex
       - uses: actions/upload-artifact@v4
         with:
-          name: keybackcon-linux-arm64
-          path: npm/platforms/linux-arm64/bin/keybackcon
+          name: ilutex-linux-arm64
+          path: npm/platforms/linux-arm64/bin/ilutex
 
   publish:
     needs: [build-x64, build-arm64]
@@ -51,13 +51,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: keybackcon-linux-x64
+          name: ilutex-linux-x64
           path: npm/platforms/linux-x64/bin
       - uses: actions/download-artifact@v4
         with:
-          name: keybackcon-linux-arm64
+          name: ilutex-linux-arm64
           path: npm/platforms/linux-arm64/bin
-      - run: chmod +x npm/platforms/linux-*/bin/keybackcon
+      - run: chmod +x npm/platforms/linux-*/bin/ilutex
       - name: Sincronizar versiones con el tag
         run: |
           VER="${GITHUB_REF_NAME#v}"

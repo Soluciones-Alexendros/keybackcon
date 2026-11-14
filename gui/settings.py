@@ -40,12 +40,12 @@ except Exception:
 _ = gettext_func()
 
 
-SCHEMA_ID = "org.iniciativas.keybackcon"
+SCHEMA_ID = "org.alexendros.ilutex"
 EFFECTS_KEY = "effects"
 RESTORE_KEY = "restore-on-login"
 REPO_URL = "https://github.com/Soluciones-Alexendros/keybackcon"
-AUTOSTART_NAME = "keybackcon-tray.desktop"
-AUTOSTART_EXEC = "keybackcon-gui --tray"
+AUTOSTART_NAME = "ilutex-tray.desktop"
+AUTOSTART_EXEC = "ilutex-gui --tray"
 
 
 def get_settings():
@@ -56,7 +56,7 @@ def get_settings():
 
 def _pref_file(name):
     base = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
-    return os.path.join(base, "keybackcon", name)
+    return os.path.join(base, "ilutex", name)
 
 
 def _read_bool_file(name, default):
@@ -136,7 +136,7 @@ def _autostart_content():
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
-        "Name=keybackcon\n"
+        "Name=iLutex\n"
         "Exec=%s\n"
         "Hidden=false\n"
         "X-GNOME-Autostart-enabled=true\n" % AUTOSTART_EXEC
@@ -254,7 +254,7 @@ if Adw is not None:
             page.set_title(_("About"))
             page.set_icon_name("help-about-symbolic")
             group = Adw.PreferencesGroup()
-            group.set_title("keybackcon")
+            group.set_title("iLutex")
             page.add(group)
             version_row = Adw.ActionRow()
             version_row.set_title(_("Version"))
@@ -381,7 +381,7 @@ if Adw is not None:
 
             try:
                 threading.Thread(
-                    target=work, name="keybackcon-restore", daemon=True
+                    target=work, name="ilutex-restore", daemon=True
                 ).start()
             except Exception:
                 log_exc("lanzar restore")

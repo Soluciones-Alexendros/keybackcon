@@ -2,35 +2,35 @@
 set -e
 
 # Instalar ≠ autorizar: este postinst crea grupo y candado, pero no añade
-# usuarios al grupo keybackcon. La habilitación es explícita (usermod + nueva sesión).
+# usuarios al grupo ilutex. La habilitación es explícita (usermod + nueva sesión).
 
 writer_ok=1
 if command -v systemd-sysusers >/dev/null 2>&1; then
-  if ! systemd-sysusers keybackcon.conf; then
-    echo "keybackcon: aviso: systemd-sysusers keybackcon.conf falló" >&2
+  if ! systemd-sysusers ilutex.conf; then
+    echo "ilutex: aviso: systemd-sysusers ilutex.conf falló" >&2
     writer_ok=0
   fi
 else
-  echo "keybackcon: aviso: systemd-sysusers no disponible" >&2
+  echo "ilutex: aviso: systemd-sysusers no disponible" >&2
   writer_ok=0
 fi
 if command -v systemd-tmpfiles >/dev/null 2>&1; then
-  if ! systemd-tmpfiles --create keybackcon.conf; then
-    echo "keybackcon: aviso: systemd-tmpfiles --create keybackcon.conf falló" >&2
+  if ! systemd-tmpfiles --create ilutex.conf; then
+    echo "ilutex: aviso: systemd-tmpfiles --create ilutex.conf falló" >&2
     writer_ok=0
   fi
 else
-  echo "keybackcon: aviso: systemd-tmpfiles no disponible" >&2
+  echo "ilutex: aviso: systemd-tmpfiles no disponible" >&2
   writer_ok=0
 fi
-if [ ! -d /run/keybackcon ] || [ ! -e /run/keybackcon/writer.lock ]; then
-  echo "keybackcon: aviso: falta /run/keybackcon/writer.lock tras la instalación" >&2
+if [ ! -d /run/ilutex ] || [ ! -e /run/ilutex/writer.lock ]; then
+  echo "ilutex: aviso: falta /run/ilutex/writer.lock tras la instalación" >&2
   writer_ok=0
 fi
 if [ "$writer_ok" = 1 ]; then
-  echo "keybackcon: candado /run/keybackcon/writer.lock listo (root:keybackcon)."
-  echo "keybackcon: para escribir, añade tu usuario al grupo: sudo usermod -aG keybackcon \"\$USER\""
-  echo "keybackcon: y abre una sesión nueva (o newgrp keybackcon)."
+  echo "ilutex: candado /run/ilutex/writer.lock listo (root:ilutex)."
+  echo "ilutex: para escribir, añade tu usuario al grupo: sudo usermod -aG ilutex \"\$USER\""
+  echo "ilutex: y abre una sesión nueva (o newgrp ilutex)."
 fi
 
 if [ -x /usr/bin/udevadm ]; then

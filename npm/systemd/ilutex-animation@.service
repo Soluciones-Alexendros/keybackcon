@@ -1,5 +1,5 @@
 [Unit]
-Description=Keyboard Backlight Controls animation (%i)
+Description=iLutex animation (%i)
 
 [Service]
 Type=simple
