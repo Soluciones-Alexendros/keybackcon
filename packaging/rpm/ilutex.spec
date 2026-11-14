@@ -3,7 +3,7 @@ Version:        3.0.0
 Release:        1%{?dist}
 Summary:        iLutex — control cromático del teclado AERO X16 vía HID LampArray
 License:        MIT
-URL:            https://github.com/Soluciones-Alexendros/keybackcon
+URL:            https://github.com/Soluciones-Alexendros/ilutex
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  cargo
 BuildRequires:  gettext

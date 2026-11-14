@@ -4,7 +4,7 @@
   "description": "Binario precompilado de iLutex para Linux arm64",
   "license": "MIT",
   "type": "commonjs",
-  "repository": "Soluciones-Alexendros/keybackcon",
+  "repository": "Soluciones-Alexendros/ilutex",
   "os": [
     "linux"
   ],
