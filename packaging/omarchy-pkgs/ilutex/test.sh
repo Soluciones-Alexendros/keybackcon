@@ -34,8 +34,10 @@ source_file=$(echo "${source[0]}" | sed 's/.*:://')
 [[ -f $source_file ]] || source_file="$package_dir/$(basename "$source_file")"
 bsdtar -xf "$source_file" -C "$srcdir" --no-same-owner
 
-build_tree="$srcdir/${pkgname}-${pkgver}"
-[[ -d $build_tree ]] || fail "the release archive extracts to ${pkgname}-${pkgver}"
+# The archive root is named after the repository, not the package.
+build_tree=$(echo "$srcdir"/*/)
+build_tree="${build_tree%/}"
+[[ -d $build_tree ]] || fail "the release archive extracts to a single root"
 
 (cd "$build_tree" && cargo build --release --locked)
 for po in "$build_tree"/po/*.po; do
