@@ -28,12 +28,23 @@ conflicts=('keybackcon' 'kbd-rgb')
 replaces=('keybackcon' 'kbd-rgb')
 backup=()
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
-# `updpkgsums` (or `helpers/upstream-watch.py sync`) fills this once the tag
-# exists; the recipe is not publishable with the placeholder.
-sha256sums=('SKIP')
+# The tag's source archive. `updpkgsums` recomputes it after a version bump.
+sha256sums=('765c61479b99febecb92217c4ded414191e8747a10d93853204705370166b1ee')
+
+# The GitHub archive names its root after the repository, which is not the
+# package name, so find the extracted tree instead of assuming it.
+_src_root() {
+  local dir
+  for dir in "$srcdir"/*/; do
+    if [ -d "$dir" ]; then
+      cd "$dir" && return 0
+    fi
+  done
+  return 1
+}
 
 build() {
-  cd "${pkgname}-${pkgver}"
+  _src_root
   cargo build --release --locked
 
   for po in po/*.po; do
@@ -45,7 +56,7 @@ build() {
 }
 
 package() {
-  cd "${pkgname}-${pkgver}"
+  _src_root
 
   install -Dm755 target/release/ilutex "$pkgdir/usr/bin/ilutex"
   install -Dm755 packaging/ilutex-gui "$pkgdir/usr/bin/ilutex-gui"
