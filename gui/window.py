@@ -244,13 +244,12 @@ class MesaWindow(Adw.ApplicationWindow):
         self.status_dot = Gtk.Label(label="●")
         self.status_text = Gtk.Label(label=_("looking at the keyboard…"))
         self.status_text.add_css_class("mono-font")
-        # Live region para lectores de pantalla (ATK role=status, aria-live=polite)
+        # Live region: el rol STATUS y un anuncio explícito son lo que GTK4
+        # entiende; `AccessibleProperty.LIVE` no existe en estas versiones.
         try:
-            self.status_text.update_property(
-                (Gtk.AccessibleProperty.LIVE,), (Gtk.AccessibleLiveRegion.POLITE,)
-            )
+            self.status_text.set_accessible_role(Gtk.AccessibleRole.STATUS)
         except Exception:
-            log_exc("live region status")
+            log_exc("rol de estado")
         pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         pill.append(self.status_dot)
         pill.append(self.status_text)
@@ -308,24 +307,15 @@ class MesaWindow(Adw.ApplicationWindow):
         seg.add_css_class("linked")
         seg.set_homogeneous(True)
         self.seg_buttons = {}
-        radio_group = None
         for key, label in (("fijar", _("Steady")), ("breathe", _("Breathe")), ("rainbow", _("Rainbow"))):
             b = Gtk.ToggleButton(label=label)
             b.set_hexpand(True)
-            # Radio group ATK para lectores de pantalla
+            # Grupo radio: el rol basta; GTK deduce el estado del ToggleButton
+            # (update_state con un bool de Python dispara un warning de GValue).
             try:
-                b.update_property(
-                    (Gtk.AccessibleProperty.ROLE, Gtk.AccessibleProperty.CHECKED),
-                    (Gtk.AccessibleRole.RADIO, False),
-                )
-                if radio_group is None:
-                    radio_group = b.get_accessible()
-                else:
-                    b.get_accessible().set_relation(
-                        Gtk.AccessibleRelation.CONTROLLER_FOR, [radio_group]
-                    )
+                b.set_accessible_role(Gtk.AccessibleRole.RADIO)
             except Exception:
-                log_exc("radio group a11y")
+                log_exc("rol de movimiento")
             seg.append(b)
             self.seg_buttons[key] = b
         g_mov.add(seg)
@@ -1155,10 +1145,15 @@ class MesaWindow(Adw.ApplicationWindow):
             dlg.set_close_response("ok")
         except Exception:
             log_exc("respuestas udev")
-        try:
-            dlg.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
-        except Exception:
-            log_exc("apariencia udev")
+        if can:
+            # Solo existe la respuesta "install" cuando hay pkexec: fijar la
+            # apariencia de una respuesta ausente dispara una crítica de Adw.
+            try:
+                dlg.set_response_appearance(
+                    "install", Adw.ResponseAppearance.SUGGESTED
+                )
+            except Exception:
+                log_exc("apariencia udev")
         try:
             dlg.connect("response", self._on_udev_response)
         except Exception:
