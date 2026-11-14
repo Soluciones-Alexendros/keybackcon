@@ -122,6 +122,34 @@ else
   bad "icono"
 fi
 
+# Receta de Arch para omarchy-pkgs: si el nombre o las rutas se separan de las
+# del producto, se publica un paquete que el resto del árbol no conoce.
+OMARCHY_PKGBUILD="${REPO_DIR}/packaging/omarchy-pkgs/ilutex/PKGBUILD"
+if [ ! -f "$OMARCHY_PKGBUILD" ]; then
+  bad "receta omarchy-pkgs ausente"
+elif ! bash -n "$OMARCHY_PKGBUILD"; then
+  bad "receta omarchy-pkgs no parsea"
+elif ! grep -qx 'pkgname=ilutex' "$OMARCHY_PKGBUILD"; then
+  bad "receta omarchy-pkgs con otro pkgname"
+elif ! grep -q 'target/release/ilutex' "$OMARCHY_PKGBUILD"; then
+  bad "receta omarchy-pkgs con otro binario"
+elif ! grep -q 'org.alexendros.ilutex.gschema.xml' "$OMARCHY_PKGBUILD"; then
+  bad "receta omarchy-pkgs con otro esquema"
+elif ! grep -q '70-ilutex.rules' "$OMARCHY_PKGBUILD"; then
+  bad "receta omarchy-pkgs sin regla udev"
+elif ! grep -q 'tmpfiles.d/ilutex.conf' "$OMARCHY_PKGBUILD"; then
+  bad "receta omarchy-pkgs sin tmpfiles"
+else
+  ok "receta omarchy-pkgs (ilutex)"
+fi
+
+PKG_TEST="${REPO_DIR}/packaging/omarchy-pkgs/ilutex/test.sh"
+if [ -f "$PKG_TEST" ] && bash -n "$PKG_TEST"; then
+  ok "test.sh de la receta parsea"
+else
+  bad "test.sh de la receta"
+fi
+
 gui_fail=0
 for py in "${REPO_DIR}"/gui/*.py; do
   if ! python3 -m py_compile "$py"; then
