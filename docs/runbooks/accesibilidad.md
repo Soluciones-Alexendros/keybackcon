@@ -10,15 +10,15 @@
 | Componente | Role esperado | Implementación actual | Estado |
 |---|---|---|---|
 | Ventana principal | `window` (implícito `Adw.ApplicationWindow`) | OK | ✅ PASS |
-| Toggle "Steady/Breathe/Rainbow" | `radio` o `toggle` en grupo | `Gtk.ToggleButton` sin grupo ATK | ⚠️ PARTIAL |
+| Toggle "Steady/Breathe/Rainbow" | `radio` en grupo | `Gtk.ToggleButton` con `AccessibleRole.RADIO` | ✅ PASS |
 | Botón "Stop motion" | `button` | `Gtk.Button` | ✅ PASS |
-| Slider brillo (0–100) | `slider` + `LABEL` + `VALUE_TEXT` | `Gtk.Scale` con `update_property` parcial | ⚠️ PARTIAL |
+| Slider brillo (0–100) | `slider` + `LABEL` + `VALUE_TEXT` | `Gtk.Scale` con `LABEL` y `VALUE_TEXT` dinámico | ✅ PASS |
 | Botones − / + brillo | `button` + tooltip | `Gtk.Button` con tooltip | ✅ PASS |
 | Label valor brillo ("60%") | `static` (texto de apoyo) | `Gtk.Label` mono-font | ✅ PASS |
 | Swatches color (6×N) | `button` con `LABEL` accesible | `Gtk.Button` + `update_property` + `ACCESSIBLE_ROLE.BUTTON` | ✅ PASS |
 | Selector tono personalizado | `color-chooser` / `button` | `Gtk.ColorDialogButton` | ✅ PASS |
 | Botón "Preferencias" (header) | `button` + tooltip | `Gtk.Button` + tooltip | ✅ PASS |
-| Estado conexión (dot + texto) | `status` (live region) | `Gtk.Label` sin `live` | ❌ FAIL |
+| Estado conexión (dot + texto) | `status` (live region) | `Gtk.Label` con `AccessibleRole.STATUS` | ✅ PASS |
 | Toast overlay | `alert` / `status` (live region) | `Adw.ToastOverlay` + `Adw.Toast` | ✅ PASS |
 | Diálogo error (`Adw.AlertDialog`) | `dialog` + `alert` | `Adw.AlertDialog` | ✅ PASS |
 | SettingsDialog (`Adw.PreferencesDialog`) | `dialog` | `Adw.PreferencesDialog` | ✅ PASS |
@@ -73,12 +73,18 @@
 
 ## 6. Acciones correctivas (prioridad)
 
-### Crítico (WCAG AA bloqueante)
-1. **A1-1**: Swatches en `FlowBox` — hacer enfocables por teclado (`focusable=True`, navegación arrows).
-2. **A1-2**: Segmento movimiento — grupo radio ATK (`Gtk.AccessibleRole.RADIO` + `Gtk.AccessibleState.CHECKED`).
-3. **A1-3**: Slider brillo — `VALUE_TEXT` dinámico al cambiar (`notify::value`).
-4. **A1-4**: Estado conexión — live region (`role="status"` + `aria-live="polite"` via `Gtk.AccessibleRole.STATUS`).
-5. **A1-5**: Texto hint (mono-font 0.75 alpha) — subir contraste o quitar alpha.
+### Corregido
+
+1. **A1-1**: Swatches en `FlowBox` enfocables (`focusable`, `can_focus`) con navegación por flechas.
+2. **A1-2**: Segmento movimiento con `Gtk.AccessibleRole.RADIO`. Sin `update_state`: con un
+   booleano de Python dispara un warning de `GValue`, y GTK ya deduce el estado del `ToggleButton`.
+3. **A1-3**: Slider brillo con `VALUE_TEXT` dinámico en `notify::value`.
+4. **A1-4**: Estado de conexión con `Gtk.AccessibleRole.STATUS`.
+5. **A1-5**: `.section-hint` pasa de `alpha(…, 0.75)` a `0.85`.
+
+Ojo con la API: `Gtk.AccessibleProperty` **no** tiene `LIVE` ni `ROLE` en GTK 4.24, y
+usarlos dentro de un `except` silencioso deja la accesibilidad sin aplicar. El rol se
+fija con `set_accessible_role()`.
 
 ### Alto
 6. **A2-1**: `animations_enabled()` — consultar `Gtk.Settings:gtk-enable-animations` Y media query `prefers-reduced-motion`.
