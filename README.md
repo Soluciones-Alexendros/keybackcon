@@ -1,7 +1,7 @@
 # iLutex
 
-[![CI](https://github.com/Soluciones-Alexendros/keybackcon/actions/workflows/ci.yml/badge.svg)](https://github.com/Soluciones-Alexendros/keybackcon/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Soluciones-Alexendros/keybackcon)](https://github.com/Soluciones-Alexendros/keybackcon/releases)
+[![CI](https://github.com/Soluciones-Alexendros/ilutex/actions/workflows/ci.yml/badge.svg)](https://github.com/Soluciones-Alexendros/ilutex/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Soluciones-Alexendros/ilutex)](https://github.com/Soluciones-Alexendros/ilutex/releases)
 ![Rust](https://img.shields.io/badge/rust-sin%20dependencias-orange)
 ![GTK4](https://img.shields.io/badge/GUI-GTK4%20%2B%20Adwaita-blue)
 ![License](https://img.shields.io/badge/licencia-MIT-green)
@@ -20,7 +20,7 @@ La mesa de luz vive también en la **bandeja del sistema**
 ## Empieza en 3 pasos
 
 1. Instala el `.deb` desde la
-   [release](https://github.com/Soluciones-Alexendros/keybackcon/releases)
+   [release](https://github.com/Soluciones-Alexendros/ilutex/releases)
    (o el script local; ver abajo).
 2. Fija un color: `ilutex set ff7800`.
 3. Abre la mesa de luz: `ilutex-gui` (requiere GTK4 y libadwaita ≥ 1.5).
@@ -28,7 +28,7 @@ La mesa de luz vive también en la **bandeja del sistema**
 ## Instalación
 
 1. **Ubuntu/Debian (`.deb`, canal principal de GUI+CLI):** descarga el `.deb`
-   de cada [release](https://github.com/Soluciones-Alexendros/keybackcon/releases)
+   de cada [release](https://github.com/Soluciones-Alexendros/ilutex/releases)
    e instala con `sudo apt install ./ilutex_X.Y.Z-1_amd64.deb`
    (binario, GUI, icono, regla udev y unidades de usuario). Debian 12:
    el CLI funciona; la mesa de luz nativa exige libadwaita ≥ 1.5 (ver matriz).

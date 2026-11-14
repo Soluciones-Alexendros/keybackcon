@@ -12,7 +12,7 @@ Antes de abrir un issue revisa estas vías.
 
 ## 2. Issues
 
-Preguntas reproducibles o propuestas concretas: [Issues](https://github.com/Soluciones-Alexendros/keybackcon/issues) (plantillas en `.github/ISSUE_TEMPLATE/`).
+Preguntas reproducibles o propuestas concretas: [Issues](https://github.com/Soluciones-Alexendros/ilutex/issues) (plantillas en `.github/ISSUE_TEMPLATE/`).
 
 No uses un issue en blanco: `blank_issues_enabled` está desactivado.
 

@@ -17,7 +17,7 @@ El postinstalador, si el entorno lo permite:
   persistido (`restore --on-login`).
 
 Para la GUI: instala el `.deb` de la
-[release](https://github.com/Soluciones-Alexendros/keybackcon/releases) o usa
+[release](https://github.com/Soluciones-Alexendros/ilutex/releases) o usa
 `./scripts/install.sh` (requiere GTK 4 y libadwaita ≥ 1.5).
 
-Fuente y documentación: https://github.com/Soluciones-Alexendros/keybackcon
+Fuente y documentación: https://github.com/Soluciones-Alexendros/ilutex

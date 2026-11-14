@@ -5,7 +5,7 @@ VERSION := $(shell sed -nE 's/^version *= *"([^"]+)".*/\1/p' Cargo.toml | head -
 PO_FILES := $(wildcard po/*.po)
 XGETTEXT_FLAGS := --language=Python --keyword=_ --keyword=N_ --from-code=UTF-8 \
 	--add-comments=TRANSLATORS --package-name=ilutex \
-	--package-version=$(VERSION) --msgid-bugs-address=https://github.com/Soluciones-Alexendros/keybackcon/issues
+	--package-version=$(VERSION) --msgid-bugs-address=https://github.com/Soluciones-Alexendros/ilutex/issues
 
 ##@ Calidad
 

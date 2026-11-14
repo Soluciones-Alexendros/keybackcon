@@ -4,8 +4,8 @@
   "description": "iLutex — control cromático del teclado AERO X16 vía HID LampArray, sin dependencias (binario precompilado + instalación automática de servicios)",
   "license": "MIT",
   "type": "commonjs",
-  "repository": "Soluciones-Alexendros/keybackcon",
-  "homepage": "https://github.com/Soluciones-Alexendros/keybackcon#readme",
+  "repository": "Soluciones-Alexendros/ilutex",
+  "homepage": "https://github.com/Soluciones-Alexendros/ilutex#readme",
   "keywords": [
     "keyboard",
     "rgb",

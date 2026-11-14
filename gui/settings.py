@@ -43,7 +43,7 @@ _ = gettext_func()
 SCHEMA_ID = "org.alexendros.ilutex"
 EFFECTS_KEY = "effects"
 RESTORE_KEY = "restore-on-login"
-REPO_URL = "https://github.com/Soluciones-Alexendros/keybackcon"
+REPO_URL = "https://github.com/Soluciones-Alexendros/ilutex"
 AUTOSTART_NAME = "ilutex-tray.desktop"
 AUTOSTART_EXEC = "ilutex-gui --tray"
 

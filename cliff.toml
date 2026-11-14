@@ -1,6 +1,6 @@
 [changelog]
 header = "# Changelog\n\n"
-body = "{% for group, commits in commits | group_by(attribute=\"group\") %}\n### {{ group | striptags | trim | upper_first }}\n{% for commit in commits %}\n- {{ commit.message | upper_first }} ([{{ commit.id | truncate(length=7, end='') }}](https://github.com/Soluciones-Alexendros/keybackcon/commit/{{ commit.id }}))\n{% endfor %}\n{% endfor %}\n"
+body = "{% for group, commits in commits | group_by(attribute=\"group\") %}\n### {{ group | striptags | trim | upper_first }}\n{% for commit in commits %}\n- {{ commit.message | upper_first }} ([{{ commit.id | truncate(length=7, end='') }}](https://github.com/Soluciones-Alexendros/ilutex/commit/{{ commit.id }}))\n{% endfor %}\n{% endfor %}\n"
 footer = ""
 trim = true
 
